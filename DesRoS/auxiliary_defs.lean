@@ -306,16 +306,19 @@ end List
 namespace Polynomial
 variable {α : Type*} [Semiring α] {P : Polynomial α}
 
-theorem nextCoeff_ne_zero (h : nextCoeff P ≠ 0) : natDegree P ≠ 0 := by
+theorem natDegree_nz_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P ≠ 0 := by
   rw [nextCoeff] at h
   by_cases hpz : (natDegree P = 0) <;> simp_all only [ne_eq, zero_le, ite_true, ite_false, not_true_eq_false]
   simp
 
-theorem nextCoeff_ge_one (h : nextCoeff P ≠ 0) : natDegree P ≥ 1 := by
-  exact Nat.zero_lt_of_ne_zero (nextCoeff_ne_zero h)
+theorem natDegree_ge_one_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P ≥ 1 :=
+  Nat.zero_lt_of_ne_zero (natDegree_nz_of_nz_nextCoeff h)
+
+theorem ne_zero_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : P ≠ 0 :=
+  ne_zero_of_natDegree_gt (natDegree_ge_one_of_nz_nextCoeff h)
 
 theorem eraseLead_natDegree_of_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P = natDegree (eraseLead P) + 1 := by
-  have hpos := nextCoeff_ge_one h
+  have hpos := natDegree_ge_one_of_nz_nextCoeff h
   suffices natDegree P - 1 ≤ natDegree (eraseLead P) by
     have := (add_le_add_iff_right 1).mpr this
     rw [← Nat.sub_add_of_ge hpos] at this
@@ -328,35 +331,45 @@ theorem eraseLead_natDegree_of_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P =
     apply Eq.symm
     apply eraseLead_coeff_of_ne
     exact Nat.pred_ne_self (Nat.ne_zero_iff_zero_lt.mpr hpos)
-  rw [nextCoeff, if_neg (nextCoeff_ne_zero h), this] at h
+  rw [nextCoeff, if_neg (natDegree_nz_of_nz_nextCoeff h), this] at h
   apply le_natDegree_of_ne_zero h
 
 theorem leadingCoeff_eraseLead_eq_nextCoeff (h : nextCoeff P ≠ 0) : nextCoeff P = leadingCoeff (eraseLead P) := by
   have hd : natDegree P = natDegree (eraseLead P) + 1 := eraseLead_natDegree_of_nextCoeff h
   rw [leadingCoeff, nextCoeff]
   rw [ne_eq] at h
-  simp only [ge_iff_le, coeff_natDegree, if_neg (nextCoeff_ne_zero h)]
+  simp only [ge_iff_le, coeff_natDegree, if_neg (natDegree_nz_of_nz_nextCoeff h)]
   rw [leadingCoeff]
-  apply Eq.symm
   rw [eraseLead_natDegree_of_nextCoeff h]
+  apply Eq.symm
   apply Polynomial.eraseLead_coeff_of_ne
   linarith
 
+theorem ne_zero_eraseLead_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : eraseLead P ≠ 0 :=
+  leadingCoeff_ne_zero.mp (leadingCoeff_eraseLead_eq_nextCoeff h ▸ h)
+
+variable {α : Type*} [Semiring α] {P : Polynomial α} [DecidableEq α]
+
 /-- A list of coefficients starting from the leading term down to the constant term. -/
-def coeffList (P : Polynomial α) : List α := (List.range (P.natDegree+1)).reverse.map P.coeff
+noncomputable def coeffList (P : Polynomial α) : List α := if P=0 then [] else (List.range (P.natDegree+1)).reverse.map P.coeff
+
+/-- coeffList 0 = [] -/
+@[simp]
+theorem coeffList_zero  : coeffList (0:α[X]) = [] := by simp [coeffList, ite_true]
 
 /-- coeffList always starts with leadingCoeff -/
-theorem coeffList_eq_cons_leadingCoeff (P : Polynomial α) : ∃(ls : List α), coeffList P = (leadingCoeff P)::ls := by
-  simp [coeffList, List.range_succ]
+theorem coeffList_eq_cons_leadingCoeff (h : P ≠ 0) : ∃(ls : List α), coeffList P = (leadingCoeff P)::ls := by
+  by_cases P = 0 <;> simp_all [coeffList, List.range_succ]
 
 /-- The length of the coefficient list is the degree. -/
 @[simp]
-theorem length_coeffList (P : Polynomial α) : (coeffList P).length = P.natDegree+1 := by
-  simp [coeffList]
+theorem length_coeffList (P : Polynomial α) : (coeffList P).length = if (P=0) then 0 else P.natDegree+1 := by
+  by_cases P = 0 <;> simp_all [coeffList]
 
 theorem coeffList_eraseLead_nz (h : nextCoeff P ≠ 0) : coeffList P = (leadingCoeff P)::(coeffList (eraseLead P)) := by
   have hd : natDegree P = natDegree (eraseLead P) + 1 := eraseLead_natDegree_of_nextCoeff h
-  simp [coeffList, hd, List.range_succ]
+  have hpz : P ≠ 0 := ne_zero_of_nz_nextCoeff h
+  simp [coeffList, hd, hpz, ne_zero_eraseLead_of_nz_nextCoeff h, List.range_succ]
   constructor
   { rw [← hd]; exact coeff_natDegree }
   constructor
@@ -387,14 +400,16 @@ theorem coeffList_eraseLead_nz (h : nextCoeff P ≠ 0) : coeffList P = (leadingC
 --   -- simp only [List.cons.injEq, true_and]
 --   sorry
 
-variable {α : Type*} [Ring α] (P : Polynomial α)
+variable {α : Type*} [Ring α] (P : Polynomial α) [DecidableEq α]
 
 /-- The coefficient list is negated if the polynomial is negated. --/
 theorem coeffList_neg : (coeffList (-P)) = (coeffList P).map (λx↦-x) := by
-  rw [coeffList, coeffList, natDegree_neg, List.map_map]
+  by_cases hp : (P = 0) <;> simp only [
+    coeffList, hp, natDegree_neg, natDegree_zero, ite_false, ite_true,
+    neg_zero, neg_eq_zero, zero_add, List.map_nil, List.map_map]
   congr; funext; simp
 
-variable {α : Type*} [DivisionSemiring α] (P : Polynomial α)
+variable {α : Type*} [DivisionSemiring α] (P : Polynomial α) [DecidableEq α]
 
 /-- Over a division semiring, multiplying a polynomial by a nonzero constant leaves the degree unchanged. -/
 @[simp]
@@ -409,19 +424,21 @@ theorem natDegree_mul_of_nonzero {η : α} (hη : η ≠ 0) : natDegree (C η * 
     next η0 => exact hη η0
     next h0 => exact h h0
 
-
 /-- Over a division semiring, multiplying a polynomial by a nonzero constant multiplies the coefficients. -/
 @[simp]
-theorem coeffList_C {η : α} : coeffList (C η) = [η] := by
+theorem coeffList_C {η : α} (hη : η ≠ 0) : coeffList (C η) = [η] := by
     simp only [coeffList, natDegree_C, zero_add]
     dsimp [List.range]
-    simp [List.range.loop]
+    simpa [List.range.loop]
 
 /-- Over a division semiring, multiplying a polynomial by a nonzero constant multiplies the coefficients. -/
 theorem coeffList_mul_C {η : α} (hη : η ≠ 0) :
   coeffList (C η * P) = (coeffList P).map (λx↦η*x) := by
+    by_cases hp : P = 0
+    case pos => simp only [hp, mul_zero, coeffList_zero, List.map_nil]
+    have hcη : C η * P ≠ 0 := mul_ne_zero (mt (map_eq_zero _).mp hη) hp
     rw [coeffList, coeffList]
-    rw [natDegree_mul_of_nonzero, List.map_map]
+    rw [natDegree_mul_of_nonzero, if_neg hcη, if_neg hp, List.map_map]
     congr
     funext n
     simp

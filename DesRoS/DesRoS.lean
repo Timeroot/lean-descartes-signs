@@ -14,9 +14,9 @@ open Polynomial
 
 namespace DesRoS
 
-variable {α : Type*} [LinearOrderedField α] (P : Polynomial α) {η : α}
+variable {α : Type*} [LinearOrderedField α] (P : Polynomial α) {η : α} [DecidableEq α]
 
-def sign_variations : ℕ :=
+noncomputable def sign_variations : ℕ :=
     let coeff_signs := (coeffList P).map SignType.sign;
     let nonzero_signs := coeff_signs.filter (·≠0);
     (nonzero_signs.destutter (·≠·)).length - 1
@@ -67,7 +67,7 @@ theorem sign_var_eq_eraseLead_of_eq_sign (h : SignType.sign (leadingCoeff P) = S
   have : leadingCoeff P ≠ 0 := by simp_all
   have : nextCoeff P ≠ 0 := by intro; simp_all
   dsimp [sign_variations]
-  rcases coeffList_eq_cons_leadingCoeff (eraseLead P) with ⟨ls, hls⟩
+  rcases coeffList_eq_cons_leadingCoeff (ne_zero_eraseLead_of_nz_nextCoeff this) with ⟨ls, hls⟩
   rw [coeffList_eraseLead_nz this, hls, ← leadingCoeff_eraseLead_eq_nextCoeff this]
   simp_all [h, List.destutter]
 
@@ -103,6 +103,8 @@ theorem succ_sign_lin_mul (hη : η > 0) {d : ℕ} (hq : Q ≠ 0) (hd : d = Q.na
     --clear the old hypotheses and use our fresh stronger ones from suffices
     clear Q hq hd
     intro Q hq hd hqpos
+    --the new polynomial isn't zero
+    have hnzηQ : (X - C η) * Q ≠ 0 := mul_ne_zero (X_sub_C_ne_zero η) hq
     --LHS is one degree higher than RHS
     have hdQ : natDegree ((X - C η) * Q) = natDegree Q + 1 := by
       rw [natDegree_mul, natDegree_X_sub_C, add_comm]
@@ -124,7 +126,8 @@ theorem succ_sign_lin_mul (hη : η > 0) {d : ℕ} (hq : Q ≠ 0) (hd : d = Q.na
           rw [← hd]
           exact zero_lt_one
         rw [mul_comm, coeff_mul_X_sub_C, sub_eq_self, this, zero_mul]
-      simp [sign_variations, coeffList, ←hd, hdQ, List.range_succ, List.filter]
+      simp only [sign_variations, coeffList, if_neg hq, if_neg hnzηQ,
+        decide_not, hdQ, ← hd, List.range_succ, sign_eq_zero_iff, List.filter]
       simp [hcQ, hxcQ, ne_of_gt hη, Left.sign_neg, sign_mul, sign_pos hη]
     }
     case neg --positive degree
