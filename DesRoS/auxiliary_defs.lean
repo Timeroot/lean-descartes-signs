@@ -74,14 +74,39 @@ end Relation
 
 -- Surely this is somewhere else and I'm just missing it, TODO
 namespace Nat
-theorem sub_add_of_ge {n : ℕ} (hn : n > 0) : n = (n - 1) + 1 := by cases n <;> simp_all
+theorem sub_add_of_ge {n : ℕ} (hn : n > 0) : n = n - 1 + 1 := by cases n <;> simp_all
+
+theorem sub_sub_of_ge {a b c : ℕ} (h : b ≥ c) : a - (b - c) = a + c - b := by
+  obtain ⟨b, rfl⟩ := exists_add_of_le h
+  rw [Nat.add_sub_self_left]
+  rw [Nat.sub_add_eq]
+  rw [Nat.add_sub_cancel]
+
 end Nat
-
-
 
 namespace List
 
 variable {α β : Type*} (l l₂ : List α) (Rα : α → α → Prop) (Rβ : β → β → Prop) (f : α → β) [DecidableRel Rα] [DecidableRel Rβ] {a b : α}
+
+/-- If two lists are the same length and get! is the same on all indices, the lists are equal. -/
+theorem ext_get! [Inhabited α] (hl : length l₁ = length l₂)
+    (h : ∀ n, get! l₁ n = get! l₂ n) : l₁ = l₂ :=
+  ext fun n => by
+      cases h₃ : get? l₁ n <;> cases h₄ : get? l₂ n
+      case none.none => rfl
+      case none.some => exfalso; linarith [get?_eq_none.mp h₃, (get?_eq_some.mp h₄).1]
+      case some.none => exfalso; linarith [get?_eq_none.mp h₄, (get?_eq_some.mp h₃).1]
+      case some.some => congr; exact (get!_of_get? h₃) ▸ (get!_of_get? h₄) ▸ h n
+
+theorem getD_reverse {l : List α} (i) (h : i < length l) :
+    getD l.reverse i = getD l (l.length - 1 - i) := by
+  funext a
+  rwa [List.getD_eq_get?, List.get?_reverse, ← List.getD_eq_get?]
+
+theorem getD_replicate_elem_eq {a} (i n) (h : i < n) :
+    getD (replicate n a) i b = a := by
+  rw [getD, get?_eq_get, get_replicate]
+  simp; simp; assumption
 
 /--If the first element of two lists are different, then a sublist relation can be reduced -/
 theorem sublist_cons_neq [DecidableEq α] {l l₂ : List α} (h₁: ¬a = b) (h₂ : a :: l <+ b :: l₂) : a :: l <+ l₂ := by
@@ -285,21 +310,23 @@ theorem length_destutter_maximal_chain_neg_trans [DecidableEq α] {n : ℕ} (h�
 -- theorem destutter'_neg_is_chunks [DecidableEq α] : ℕ := sorry
 --   ∃c:List (List α), (destutter (·≠·) l = (c.map (λls↦List.get ls 1))) := by
 --   sorry
+-- nope, didn't end up writing that proof
 
-/-- (a::l).get n = l.get (n-1), as long as n≠0. -/
-theorem get_cons_pos {l : List α} {n : Nat} (hp : n ≠ 0) (hl : n ≤ l.length) :
-  (a :: l).get ⟨n, by rw [length_cons]; exact Nat.lt_succ.2 hl⟩
-  = l.get ⟨n-1, Nat.lt_of_lt_of_le (Nat.pred_lt hp) hl⟩ := by
-    suffices get ([a]++l) ⟨n, by simp; exact Nat.lt_succ.2 hl⟩ =
-      get l ⟨n-1, Nat.lt_of_lt_of_le (Nat.pred_lt hp) hl⟩ by
-      simp at this
-      exact this
-    rw [List.get_append_right]; rfl
-    rw [length_singleton]
-    intro hn
-    have := Nat.le_sub_one_of_lt hn
-    simp only [ge_iff_le, le_refl, tsub_eq_zero_of_le, nonpos_iff_eq_zero] at this
-    exact hp this
+-- it typechecks but it's garbage
+-- /-- (a::l).get n = l.get (n-1), as long as n≠0. -/
+-- theorem get_cons_pos {l : List α} {n : Nat} (hp : n ≠ 0) (hl : n ≤ l.length) :
+--   (a :: l).get ⟨n, by rw [length_cons]; exact Nat.lt_succ.2 hl⟩
+--   = l.get ⟨n-1, Nat.lt_of_lt_of_le (Nat.pred_lt hp) hl⟩ := by
+--     suffices get ([a]++l) ⟨n, by simp; exact Nat.lt_succ.2 hl⟩ =
+--       get l ⟨n-1, Nat.lt_of_lt_of_le (Nat.pred_lt hp) hl⟩ by
+--       simp at this
+--       exact this
+--     rw [List.get_append_right]; rfl
+--     rw [length_singleton]
+--     intro hn
+--     have := Nat.le_sub_one_of_lt hn
+--     simp only [ge_iff_le, le_refl, tsub_eq_zero_of_le, nonpos_iff_eq_zero] at this
+--     exact hp this
 
 end List
 
@@ -355,7 +382,13 @@ noncomputable def coeffList (P : Polynomial α) : List α := if P=0 then [] else
 
 /-- coeffList 0 = [] -/
 @[simp]
-theorem coeffList_zero  : coeffList (0:α[X]) = [] := by simp [coeffList, ite_true]
+theorem coeffList_zero  : coeffList (0:α[X]) = [] := by
+  simp [coeffList, ite_true]
+
+/-- coeffList (C x) = [x] -/
+@[simp]
+theorem coeffList_C {η : α} (h : η ≠ 0): coeffList (C η) = [η] := by
+  simp [coeffList, if_neg h, List.range_succ]
 
 /-- coeffList always starts with leadingCoeff -/
 theorem coeffList_eq_cons_leadingCoeff (h : P ≠ 0) : ∃(ls : List α), coeffList P = (leadingCoeff P)::ls := by
@@ -386,19 +419,138 @@ theorem coeffList_eraseLead_nz (h : nextCoeff P ≠ 0) : coeffList P = (leadingC
   apply Polynomial.eraseLead_coeff_of_ne
   linarith
 
--- theorem coeffList_eraseLead (h : P≠0): ∃(n:ℕ), coeffList P = (leadingCoeff P)::((List.replicate n 0)++(coeffList (eraseLead P))) := by
---   -- have : natDegree P >
---   have : natDegree P ≥ natDegree (eraseLead P) + 1 := by
---     have := eraseLead_natDegree_le P
---     have : natDegree (eraseLead P) + 1 ≤ (natDegree P - 1) + 1 := (add_le_add_iff_right 1).mpr this
---     rwa [← Nat.sub_add_of_ge h] at this
---   use natDegree P - (natDegree (eraseLead P) + 1)
---   apply List.ext_get
---   simp
---   -- obtain ⟨ls, hls⟩ := coeffList_eq_cons_leadingCoeff P
---   -- rw [hls]
---   -- simp only [List.cons.injEq, true_and]
---   sorry
+theorem coeffList_eraseLead (h : P≠0) : ∃(n:ℕ), coeffList P = (leadingCoeff P)::((List.replicate n 0)++(coeffList (eraseLead P))) := by
+  by_cases hdp : natDegree P = 0
+  case pos =>
+    use 0
+    rw [eq_C_of_natDegree_eq_zero hdp] at h ⊢
+    have hcnz := coeffList_C (C_ne_zero.mp h)
+    rw [hcnz]
+    simp
+  replace hdp := Nat.ne_zero_iff_zero_lt.mp hdp
+  have hd : natDegree P ≥ natDegree (eraseLead P) + 1 := by
+    have := eraseLead_natDegree_le P
+    have : natDegree (eraseLead P) + 1 ≤ (natDegree P - 1) + 1 := (add_le_add_iff_right 1).mpr this
+    rwa [← Nat.sub_add_of_ge hdp] at this
+  obtain ⟨dd, hd⟩ := exists_add_of_le hd
+  rw [Nat.add_comm] at hd
+  use if eraseLead P = 0 then natDegree P else dd
+  --need α to be Inhabited to use get!, so we designate 0 as the default
+  have _ : Inhabited α := ⟨0⟩
+  apply List.ext_get! <;> by_cases hep : eraseLead P = 0
+  case pos => --lengths are equal, eraseLead P = 0
+    simp [if_pos hep, h]
+  case neg => --lengths are equal, eraseLead P ≠ 0
+    simp [if_neg hep, h]
+    exact Nat.add_comm dd _ ▸ hd
+  case pos => --contents are equal, eraseLead P = 0
+    intro n
+    simp only [if_pos hep, nonpos_iff_eq_zero, tsub_zero, List.get!_eq_getD]
+    cases n
+    case zero => --0th element is the same
+      obtain ⟨ls, hls⟩ := coeffList_eq_cons_leadingCoeff h
+      simp_all [List.get]
+    case succ n1 => --1st element on is the same
+      simp_rw [coeffList, if_pos hep, if_neg h]
+      simp_all only [natDegree_zero, Fin.cast_mk, List.get_map,
+        List.append_nil, List.length_cons, Nat.sub_zero]
+      clear hdp
+      rw [List.map_reverse]
+      by_cases hnp : n1 + 1 < natDegree P + 1
+      case pos =>
+        rw [List.getD_reverse]
+        case h =>
+          rw [List.length_map, List.length_range]
+          exact hd ▸ hnp
+        rw [List.getD_cons_succ, List.getD, List.length_map, List.length_range, List.get?_map]
+        rw [List.get?_range, Option.map_some', Option.getD_some, add_tsub_cancel_right]
+        rw [List.getD_replicate_elem_eq]
+        case h => exact (add_lt_add_iff_right 1).mp (hd ▸ hnp)
+        obtain ⟨np, hnp⟩ := exists_add_of_le (Nat.le_of_lt_succ hnp)
+        have hnp2 : np = natDegree P - (n1 + 1) := (Nat.sub_eq_of_eq_add (Nat.add_comm _ np ▸ hnp)).symm
+        have : coeff (eraseLead P) np = coeff P np := by
+          apply eraseLead_coeff_of_ne np
+          linarith
+        rw [hd] at hnp2
+        rw [← hnp2, ← this, hep, coeff_zero]
+        calc
+          dd + 1 - (n1 + 1) ≤ dd + 1 := by exact Nat.sub_le (dd + 1) (n1 + 1)
+          dd + 1 < dd + 2 := by simp
+      case neg =>
+        replace hnp := Nat.ge_of_not_lt hnp
+        simp only [List.getD_cons_succ]
+        rw [List.getD_eq_default, List.getD_eq_default]
+        simp_all
+        simp_all only [List.length_reverse, List.length_map, List.length_range]
+  case neg => --contents are equal, eraseLead P ≠ 0
+    simp [if_neg hep]
+    intro n
+    cases n
+    case zero => --0th element is the same
+      obtain ⟨ls, hls⟩ := coeffList_eq_cons_leadingCoeff h
+      simp_all [List.get]
+    case succ n1 => --1st element on is the same
+      simp_rw [coeffList, if_neg hep, if_neg h]
+      simp_rw [List.map_reverse]
+      by_cases hnp : n1 + 1 < natDegree P + 1
+      case pos =>
+        obtain ⟨dp, hdp⟩ := exists_add_of_le (Nat.le_of_lt_succ hnp)
+        rw [List.getD_reverse]
+        case h => simpa
+        simp only [List.getD_cons_succ]
+        rw [List.getD, List.length_map, List.length_range]
+        rw [List.get?_map]
+        rw [List.get?_range, Option.map_some', Option.getD_some, add_tsub_cancel_right]
+        have : coeff (eraseLead P) dp = coeff P dp := by
+          apply eraseLead_coeff_of_ne dp
+          linarith
+        -- rw [hd] at hdp
+        rw [hdp, add_tsub_cancel_left, ← this]
+        by_cases hnp2 : n1 < dd
+        case pos => --goes into the 0's chunk
+          obtain ⟨d2, hd2⟩ := exists_add_of_le (Nat.succ_le_of_lt hnp2)
+          rw [List.getD_append]
+          case h =>
+            rw [List.length_replicate]
+            exact hnp2
+          rw [List.getD_replicate_elem_eq]
+          case h => exact hnp2
+          apply coeff_eq_zero_of_natDegree_lt
+          linarith
+        case neg => --goes into the coeffList eraseLead chunk
+          obtain ⟨d3, hd3⟩ := exists_add_of_le (Nat.ge_of_not_lt hnp2)
+          rw [List.getD_append_right]
+          case h =>
+            rw [List.length_replicate]
+            exact Nat.le_of_not_gt hnp2
+          rw [List.length_replicate, List.getD_reverse, List.getD, List.get?_map]
+          case h =>
+            rw [List.length_map, List.length_range]
+            rw [hd3, add_tsub_cancel_left]
+            linarith
+          rw [List.length_map, List.length_range]
+          rw [List.get?_range, Option.map_some', Option.getD_some, add_tsub_cancel_right]
+          congr 1
+          rw [hd3, add_tsub_cancel_left]
+          rw [hd3] at hdp
+          rw [hdp] at hd
+          rw [← Nat.add_assoc, Nat.add_assoc, Nat.add_comm 1 _, ← Nat.add_assoc] at hd
+          replace hd := Nat.add_right_cancel hd
+          rw [Nat.add_assoc, Nat.add_comm d3 _] at hd
+          replace hd := Nat.add_left_cancel hd
+          exact (Nat.sub_eq_of_eq_add hd.symm).symm
+          rw [Nat.sub_sub]
+          apply Nat.sub_lt <;> simp
+        rw [add_tsub_cancel_right]
+        calc
+          natDegree P - Nat.succ n1 ≤ natDegree P := Nat.sub_le _ _
+          natDegree P < natDegree P + 1 := Nat.lt_succ_self _
+      case neg =>
+        replace hnp := Nat.ge_of_not_lt hnp
+        simp only [List.getD_cons_succ]
+        rw [List.getD_eq_default, List.getD_eq_default]
+        simp_all
+        simp_all only [List.length_reverse, List.length_map, List.length_range]
 
 variable {α : Type*} [Ring α] (P : Polynomial α) [DecidableEq α]
 
@@ -423,13 +575,6 @@ theorem natDegree_mul_of_nonzero {η : α} (hη : η ≠ 0) : natDegree (C η * 
     intro hPη0; cases hPη0
     next η0 => exact hη η0
     next h0 => exact h h0
-
-/-- Over a division semiring, multiplying a polynomial by a nonzero constant multiplies the coefficients. -/
-@[simp]
-theorem coeffList_C {η : α} (hη : η ≠ 0) : coeffList (C η) = [η] := by
-    simp only [coeffList, natDegree_C, zero_add]
-    dsimp [List.range]
-    simpa [List.range.loop]
 
 /-- Over a division semiring, multiplying a polynomial by a nonzero constant multiplies the coefficients. -/
 theorem coeffList_mul_C {η : α} (hη : η ≠ 0) :
