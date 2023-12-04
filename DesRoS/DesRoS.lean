@@ -63,7 +63,8 @@ lemma sign_var_eq_sign_var_mul (hη : η ≠ 0) :
 /-- If the first two signs are the same, then sign_variations is unchanged by eraseLead -/
 theorem sign_var_eq_eraseLead_of_eq_sign (h : SignType.sign (leadingCoeff P) = SignType.sign (nextCoeff P)) :
   sign_variations P = sign_variations (eraseLead P) := by
-  by_cases hpz : (P = 0) <;> try simp_all
+  by_cases hpz : (P = 0)
+  case pos => simp_all
   have : leadingCoeff P ≠ 0 := by simp_all
   have : nextCoeff P ≠ 0 := by intro; simp_all
   dsimp [sign_variations]
@@ -71,16 +72,67 @@ theorem sign_var_eq_eraseLead_of_eq_sign (h : SignType.sign (leadingCoeff P) = S
   rw [coeffList_eraseLead_nz this, hls, ← leadingCoeff_eraseLead_eq_nextCoeff this]
   simp_all [h, List.destutter]
 
+/-- If we drop the leading coefficient, the sign changes by 0 or 1 depending on whether it matches
+    leading coefficient of eraseLead. -/
+theorem sign_var_le_eraseLead_ite (h : P ≠ 0) : sign_variations P = sign_variations (eraseLead P) +
+  if SignType.sign (leadingCoeff P) = -SignType.sign (leadingCoeff (eraseLead P)) then 1 else 0
+ := by
+  by_cases hpz : P = 0
+  case pos => simp_all
+  have hsl : SignType.sign (leadingCoeff P) ≠ 0 := by simp_all
+  dsimp [sign_variations]
+  obtain ⟨nz, hc⟩ := coeffList_eraseLead hpz
+  rw [hc, List.map_cons, List.map_append, List.map_replicate, List.filter, decide_eq_true hsl]
+  simp only [decide_not, lt_self_iff_false, sign_zero, List.filter_append, List.filter_replicate]
+  simp only [decide_True, Bool.not_true, ite_false, List.nil_append]
+  cases hcep : (coeffList (eraseLead P))
+  case neg.intro.nil =>
+    have : eraseLead P = 0 := coeffList_nil hcep
+    simp_all
+  case neg.intro.cons c cs =>
+    rw [List.map_cons, List.filter]
+    by_cases hc2 : SignType.sign c = 0
+    case pos =>
+      have : eraseLead P = 0 := by
+        by_contra h
+        obtain ⟨l, hl⟩ := coeffList_eq_cons_leadingCoeff h
+        rw [hcep] at hl
+        simp [List.cons_inj] at hl
+        rcases hl with ⟨ha, _⟩
+        rw [sign_eq_zero_iff.mp hc2] at ha
+        exact h (leadingCoeff_eq_zero.mp ha.symm)
+      simp_all
+    simp only [List.destutter, decide_eq_false hc2, Bool.not_false, List.destutter']
+    have hel : eraseLead P ≠ 0 := by
+      by_contra h; revert hcep
+      rw [h, coeffList_zero]
+      simp
+    have hc4 : c = leadingCoeff (eraseLead P) := by
+      obtain ⟨ls,hls⟩ := coeffList_eq_cons_leadingCoeff hel
+      cases (hcep ▸ hls); rfl
+    by_cases hc3 : SignType.sign (leadingCoeff P) = SignType.sign c
+    case pos =>
+      cases hc6 : SignType.sign c <;> cases hl2 : SignType.sign (leadingCoeff P) <;> rw [hc6] at hc2 <;> simp_all
+    case neg =>
+      have hc5 : SignType.sign (leadingCoeff P) = -SignType.sign c := by
+        cases hc6 : SignType.sign c <;> cases hl2 : SignType.sign (leadingCoeff P) <;> simp_all
+      rw [if_pos hc3, ← hc4, if_pos hc5]
+      rw [← Nat.sub_add_of_ge (List.destutter'_length_pos _ _)]
+      simp
+
 /-- We can only lose, not gain, sign changes if we drop the leading coefficient -/
 theorem sign_var_ge_eraseLead : sign_variations P ≥ sign_variations (eraseLead P) := by
-  dsimp [sign_variations]
-  -- rw [coeffList_eraseLead]
-  -- simp
-  sorry
+  by_cases hpz : P = 0
+  case pos => simp_all
+  have := sign_var_le_eraseLead_ite P
+  by_cases SignType.sign (leadingCoeff P) = -SignType.sign (leadingCoeff (eraseLead P)) <;> simp_all
 
 /-- We can only lose at most one sign changes if we drop the leading coefficient -/
 theorem sign_var_le_eraseLead_succ : sign_variations P ≤ sign_variations (eraseLead P) + 1 := by
-  sorry
+  by_cases hpz : P = 0
+  case pos => simp_all
+  have := sign_var_le_eraseLead_ite P
+  by_cases SignType.sign (leadingCoeff P) = -SignType.sign (leadingCoeff (eraseLead P)) <;> simp_all
 
 /-- Multiplying by (X-η) adds at least one sign change -/
 theorem succ_sign_lin_mul (hη : η > 0) {d : ℕ} (hq : Q ≠ 0) (hd : d = Q.natDegree):
@@ -145,20 +197,22 @@ theorem succ_sign_lin_mul (hη : η > 0) {d : ℕ} (hq : Q ≠ 0) (hd : d = Q.na
       -- simp only [List.append_assoc, List.singleton_append, List.reverse_append, List.reverse_cons,
       --   List.reverse_nil, List.nil_append, List.cons_append, List.map_cons, Function.comp_apply]
 
-      set sq0 := SignType.sign (coeff Q (d + 1)) with hsq0
-      set sq1 := SignType.sign (coeff Q d) with hsq1
-      set sηq0 := SignType.sign (coeff ((X - C η) * Q) (d + 2)) with hsηq0
-      set sηq1 := SignType.sign (coeff ((X - C η) * Q) (d + 1)) with hsηq1
+      set sq0 := SignType.sign (leadingCoeff Q) with hsq0
+      set sq1 := SignType.sign (nextCoeff Q) with hsq1
+      set sηq0 := SignType.sign (leadingCoeff ((X - C η) * Q)) with hsηq0
+      set sηq1 := SignType.sign (nextCoeff ((X - C η) * Q)) with hsηq1
 
       have h_sq0_pos : sq0 = 1 := by
-        rw [hsq0, hd, ← leadingCoeff]
-        exact sign_pos hqpos
+        -- rw [hsq0, hd, ← leadingCoeff]
+        -- exact sign_pos hqpos
+        sorry
 
       have h_sq0_sηq0 : sq0 = sηq0 := by
-        have : coeff Q (d + 1 + 1) = 0 := by
-          rw [hd]
-          apply coeff_natDegree_succ_eq_zero
-        rw [hsq0, hsηq0, mul_comm, coeff_mul_X_sub_C, this, zero_mul, sub_zero]
+        -- have : coeff Q (d + 1 + 1) = 0 := by
+        --   rw [hd]
+        --   apply coeff_natDegree_succ_eq_zero
+        -- rw [hsq0, hsηq0, mul_comm, coeff_mul_X_sub_C, this, zero_mul, sub_zero]
+        sorry
 
       have hnDeQ : natDegree (eraseLead Q) < d + 1 :=
         Nat.succ_le_succ (add_tsub_cancel_right d 1 ▸ hd ▸ (eraseLead_natDegree_le Q))

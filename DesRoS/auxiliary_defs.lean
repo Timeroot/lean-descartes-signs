@@ -108,6 +108,11 @@ theorem getD_replicate_elem_eq {a} (i n) (h : i < n) :
   rw [getD, get?_eq_get, get_replicate]
   simp; simp; assumption
 
+theorem filter_replicate {f : α → Bool} : List.filter f (List.replicate n a) = if f a then List.replicate n a else [] := by
+  induction n with
+  | zero => simp
+  | succ n ih => by_cases hf : f a <;> simp_all
+
 /--If the first element of two lists are different, then a sublist relation can be reduced -/
 theorem sublist_cons_neq [DecidableEq α] {l l₂ : List α} (h₁: ¬a = b) (h₂ : a :: l <+ b :: l₂) : a :: l <+ l₂ := by
   apply isSublist_iff_sublist.mp
@@ -384,6 +389,10 @@ noncomputable def coeffList (P : Polynomial α) : List α := if P=0 then [] else
 @[simp]
 theorem coeffList_zero  : coeffList (0:α[X]) = [] := by
   simp [coeffList, ite_true]
+
+/-- only the zero polynomial gives nil list -/
+theorem coeffList_nil(h : coeffList P = []): P = 0 := by
+  by_cases P = 0 <;> simp_all [coeffList]
 
 /-- coeffList (C x) = [x] -/
 @[simp]
