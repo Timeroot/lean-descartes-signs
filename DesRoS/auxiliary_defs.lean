@@ -335,22 +335,61 @@ theorem length_destutter_maximal_chain_neg_trans [DecidableEq α] {n : ℕ} (h�
 
 end List
 
+-- theorem sign_trichotomy_pos {c : SignType} (h₁ : c ≠ 0) (h₂ : ¬c > 0) : c = SignType.neg := by
+--   cases c <;> simp_all
+
+-- theorem sign_trichotomy_neg {c : SignType} (h₁ : c ≠ 0) (h₂ : ¬c < 0) : c = SignType.pos := by
+--   cases c <;> simp_all
+
+-- theorem sign_trichotomy_zero {c : SignType} (h₁ : ¬c < 0) (h₂ : ¬c > 0) : c = SignType.zero := by
+--   cases c <;> simp_all
+
 namespace Polynomial
 variable {α : Type*} [Semiring α] {P : Polynomial α}
+
+theorem card_support_mul (P Q : Polynomial α) : (P*Q).support.card ≤ P.support.card * Q.support.card := by
+  calc (P * Q).support.card
+   _ = (P.toFinsupp * Q.toFinsupp).support.card := by rw [← support_toFinsupp, toFinsupp_mul]
+   _ ≤ _ := Finset.card_le_of_subset (AddMonoidAlgebra.support_mul P.toFinsupp Q.toFinsupp)
+   _ ≤ _ := by
+    apply Finset.card_biUnion_le_card_mul;
+    intro _ _
+    rw [← mul_one Q.support.card]
+    apply Finset.card_biUnion_le_card_mul;
+    intro _ _
+    exact (Finset.card_singleton _) ▸ le_rfl
+
+--There's several theorems upper-bounding the P.eraseLead.support.card in terms of P.support.card, but none going
+-- other way!
+theorem eraseLead_card_support_one (h : P ≠ 0) :
+  P.eraseLead.support.card + 1 = P.support.card := by
+    set c := P.support.card with hc
+    cases h₁ : c
+    case zero => by_contra; exact h (card_support_eq_zero.mp h₁);
+    case succ => exact Nat.succ_inj'.mpr (eraseLead_card_support' (hc ▸ h₁))
+
+theorem card_support_eq_one_of_eraseLead_zero (h₀ : P ≠ 0) (h₁ : eraseLead P = 0) : P.support.card = 1 :=
+  (card_support_eq_zero.mpr h₁ ▸ eraseLead_card_support_one h₀).symm
+
+theorem card_support_lt_one_of_eraseLead_zero (h : eraseLead P = 0) : P.support.card ≤ 1 := by
+  by_cases hpz : P = 0
+  case pos => simp [hpz]
+  case neg => exact le_of_eq (card_support_eq_one_of_eraseLead_zero hpz h)
+
 
 theorem natDegree_nz_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P ≠ 0 := by
   rw [nextCoeff] at h
   by_cases hpz : (natDegree P = 0) <;> simp_all only [ne_eq, zero_le, ite_true, ite_false, not_true_eq_false]
-  simp
+  trivial
 
-theorem natDegree_ge_one_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P ≥ 1 :=
+theorem natDegree_pos_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P > 0 :=
   Nat.zero_lt_of_ne_zero (natDegree_nz_of_nz_nextCoeff h)
 
 theorem ne_zero_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : P ≠ 0 :=
-  ne_zero_of_natDegree_gt (natDegree_ge_one_of_nz_nextCoeff h)
+  ne_zero_of_natDegree_gt (natDegree_pos_of_nz_nextCoeff h)
 
 theorem eraseLead_natDegree_of_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P = natDegree (eraseLead P) + 1 := by
-  have hpos := natDegree_ge_one_of_nz_nextCoeff h
+  have hpos := natDegree_pos_of_nz_nextCoeff h
   suffices natDegree P - 1 ≤ natDegree (eraseLead P) by
     have := (add_le_add_iff_right 1).mpr this
     rw [← Nat.sub_add_of_ge hpos] at this
@@ -366,10 +405,52 @@ theorem eraseLead_natDegree_of_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P =
   rw [nextCoeff, if_neg (natDegree_nz_of_nz_nextCoeff h), this] at h
   apply le_natDegree_of_ne_zero h
 
+theorem natDegree_pos_of_eraseLead_nz (h : eraseLead P ≠ 0) : natDegree P > 0 := by
+  by_contra h₂
+  rw [eq_C_of_natDegree_eq_zero (Nat.eq_zero_of_not_pos h₂)] at h
+  simp at h
+
+theorem eraseLead_natDegree_of_zero_nextCoeff (h : nextCoeff P = 0) : natDegree P - 2 ≥ natDegree (eraseLead P) := by
+  -- If eraseLead P = 0, it's trivial.
+  by_cases hepz : eraseLead P = 0; case pos => simp_all
+  -- So take eraseLead P ≠ 0. This also means natDegree P ≠ 0.
+  have hdp : natDegree P ≠ 0 := ne_of_gt (natDegree_pos_of_eraseLead_nz hepz)
+  -- Just need to show that eraseLead didn't reduce degree by exactly one.
+  suffices natDegree P - 1 ≠ natDegree (eraseLead P) by
+    exact Nat.le_pred_of_lt (lt_of_le_of_ne (eraseLead_natDegree_le P) this.symm)
+  -- By contradiction: eraseLead P would start with nextCoeff P, but that's zero.
+  -- And nonzero polynomials never start with a zero.
+  by_contra h₂
+  have h₃ : coeff (eraseLead P) (natDegree (eraseLead P)) = coeff P (natDegree P - 1) := by
+    rw [h₂]
+    apply eraseLead_coeff_of_ne
+    intro hc
+    have h₄ := eraseLead_natDegree_le P
+    obtain ⟨d1, hd1⟩ := Nat.exists_eq_succ_of_ne_zero hdp
+    rw [hd1, Nat.succ_sub_succ_eq_sub, tsub_zero, hc, hd1] at h₄
+    exact not_le_of_gt (Nat.lt_succ_self d1) h₄
+  simp only [nextCoeff, hdp, ite_false] at h
+  exact hepz (leadingCoeff_eq_zero.mp (h ▸ h₃))
+
+theorem natDegree_ge_2_of_nextCoeff_eraseLead (h₁ : eraseLead P ≠ 0) (h₂ : nextCoeff P = 0) : natDegree P ≥ 2 := by
+  rcases lt_trichotomy (natDegree P) 1 with h₃ | h₃ | h₃
+  case _ =>
+    by_contra; revert h₁
+    rw [eq_C_of_natDegree_eq_zero (Nat.lt_one_iff.mp h₃), eraseLead_C]
+    simp
+  case _ =>
+    by_contra;
+    have h₀ : natDegree (eraseLead P) = 0 :=
+      nonpos_iff_eq_zero.mp (tsub_eq_zero_of_le (le_refl 1) ▸ h₃ ▸ eraseLead_natDegree_le P)
+    rw [nextCoeff, h₃, if_neg one_ne_zero, tsub_self] at h₂
+    rw [eq_C_of_natDegree_eq_zero h₀, eraseLead_coeff_of_ne, h₂] at h₁
+    simp at h₁
+    simp [h₃]
+  exact h₃
+
 theorem leadingCoeff_eraseLead_eq_nextCoeff (h : nextCoeff P ≠ 0) : nextCoeff P = leadingCoeff (eraseLead P) := by
   have hd : natDegree P = natDegree (eraseLead P) + 1 := eraseLead_natDegree_of_nextCoeff h
   rw [leadingCoeff, nextCoeff]
-  rw [ne_eq] at h
   simp only [ge_iff_le, coeff_natDegree, if_neg (natDegree_nz_of_nz_nextCoeff h)]
   rw [leadingCoeff]
   rw [eraseLead_natDegree_of_nextCoeff h]
@@ -387,11 +468,11 @@ noncomputable def coeffList (P : Polynomial α) : List α := if P=0 then [] else
 
 /-- coeffList 0 = [] -/
 @[simp]
-theorem coeffList_zero  : coeffList (0:α[X]) = [] := by
+theorem coeffList_zero (α : Type*) [Semiring α] [DecidableEq α] : coeffList (0:α[X]) = [] := by
   simp [coeffList, ite_true]
 
 /-- only the zero polynomial gives nil list -/
-theorem coeffList_nil(h : coeffList P = []): P = 0 := by
+theorem coeffList_nil (h : coeffList P = []) : P = 0 := by
   by_cases P = 0 <;> simp_all [coeffList]
 
 /-- coeffList (C x) = [x] -/
