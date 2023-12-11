@@ -5,6 +5,289 @@ namespace DesRoS
 open Polynomial
 variable {α : Type*} [LinearOrderedField α] (P : Polynomial α) {η : α} [DecidableEq α]
 
+--specialization of the final theorem for monomials
+lemma succ_sign_lin_mul_monomial {d c} (hqz : Q ≠ 0) (hη : η > 0) (hm : Q = monomial d c) :
+  sign_variations ((X - C η) * Q) ≥ sign_variations Q + 1 := by
+    suffices sign_variations ((X - C η) * Q) ≥ 1 by
+      have : sign_variations Q + 1 = 1 := by rw [hm, sign_var_monomial]
+      linarith
+    have hc : c ≠ 0 := by
+      by_contra hc;
+      exact hqz ((hc ▸ hm) ▸ monomial_zero_right d)
+    dsimp [sign_variations]
+    have h₀ : leadingCoeff ((X - C η) * Q) = c := by rw [hm]; simp
+    have h₁ : natDegree ((X - C η) * (monomial d c)) = d + 1 := by
+      rw [natDegree_mul (X_sub_C_ne_zero η) (hm ▸ hqz), natDegree_X_sub_C, natDegree_monomial, if_neg hc, add_comm]
+    have h₂ : nextCoeff ((X - C η) * Q) = -(c*η) := by
+      rw [hm, nextCoeff, h₁];
+      simp? says simp only [add_eq_zero, one_ne_zero, and_false, ge_iff_le, add_le_iff_nonpos_left,
+        nonpos_iff_eq_zero, add_tsub_cancel_right, ite_false]
+      nth_rewrite 2 [← zero_add d]
+      rw [mul_comm, coeff_monomial_mul]
+      simp
+    have h₃ : nextCoeff ((X - C η) * Q) ≠ 0 := h₂ ▸ (neg_ne_zero.mpr (mul_ne_zero hc (ne_of_gt hη)))
+    have this : eraseLead ((X - C η) * Q) ≠ 0 := ne_zero_eraseLead_of_nz_nextCoeff h₃
+    rw [coeffList_eraseLead_nz h₃]
+    obtain ⟨rs, hrs⟩ := coeffList_eraseLead this
+    rw [hrs]
+    rw [← leadingCoeff_eraseLead_eq_nextCoeff h₃, h₀, h₂]
+    have hds : SignType.sign c ≠ SignType.sign (-(c*η)) := by
+      simp [sign_pos hη, Left.sign_neg, sign_mul]
+      exact hc
+    rw [List.map_cons, List.map_cons, List.filter, List.filter]
+    simp only [sign_eq_zero_iff, hc, not_false_eq_true, decide_True,
+      Left.neg_neg_iff, neg_eq_zero, mul_eq_zero, or_self, decide_not,
+      sign_zero, List.filter_append, ne_of_gt hη]
+    rw [List.destutter_cons_cons, if_pos hds, List.length_cons]
+    apply List.destutter'_length_pos
+
+--if we erase the leading coefficient of a coeffList like [+,0,...], and then multiply by a linear term,
+--it's equivalent to erasing the first two coefficients of the product.
+lemma eraseLead_two_mul_eq_mul_eraseLead_of_nextCoeff_zero
+  (hη : η ≠ 0) (h : nextCoeff P = 0) :
+  eraseLead (eraseLead ((X - C η) * P)) = (X - C η) * (eraseLead P) := by
+    --can assume P ≠ 0
+    by_cases hpz : P = 0
+    case pos => simp_all
+    case neg => {
+      -- degree of (X - C η) * P is one more than degree of P
+      have h₁ : natDegree ((X - C η) * P) = natDegree P + 1 := by
+        rw [natDegree_mul (X_sub_C_ne_zero η) hpz, natDegree_X_sub_C, add_comm]
+      --can assume eraseLead P > 0
+      by_cases hez : eraseLead P = 0
+      case pos =>
+        rw [hez, mul_zero]
+        by_cases hez2 : eraseLead ((X - C η) * P) = 0
+        case pos => rw [hez2]; simp
+        apply card_support_eq_zero.mp
+        have := eraseLead_support_card_lt hez2
+        have : Finset.card (support (eraseLead ((X - C η) * P))) < Finset.card (support ((X - C η) * P)) := by
+          apply eraseLead_support_card_lt
+          exact mul_ne_zero (X_sub_C_ne_zero η) hpz
+        have : Finset.card (support ((X - C η) * P)) ≤ 2 := by
+          have hmul := card_support_mul (X - C η) P
+          have hp1 := card_support_lt_one_of_eraseLead_zero hez
+          suffices (X - C η).support.card = 2 by
+            rw [this] at hmul
+            linarith
+          have : (C 1 * X ^ 1 + C (-η) * X ^ 0).support.card = 2 :=
+            card_support_binomial one_ne_zero one_ne_zero (neg_ne_zero.mpr hη)
+          simp at this
+          rwa [← sub_eq_add_neg] at this
+        linarith
+      case neg => {
+        -- natDegree P ≥ 2
+        obtain ⟨dP, hdP⟩ := Nat.exists_eq_add_of_le (natDegree_ge_2_of_nextCoeff_eraseLead hez h)
+        rw [add_comm] at hdP
+        --turn "nextCoeff P = 0" into "coeff P dP = 0"
+        have h₂ := h
+        simp only [nextCoeff, hdP, Nat.succ_ne_zero, one_ne_zero,
+          add_tsub_cancel_right, ite_false, Nat.succ_sub_succ_eq_sub, tsub_zero] at h₂
+        -- the subleading term of (X - C η) * P is nonzero
+        have h₂ : nextCoeff ((X - C η) * P) ≠ 0 := by
+          rw [nextCoeff, h₁, mul_comm, hdP]
+          simp only [Nat.succ_ne_zero, one_ne_zero, add_tsub_cancel_right, ite_false]
+          rw [coeff_mul_X_sub_C, h₂]
+          simp only [ne_eq, zero_sub, neg_eq_zero, mul_eq_zero, not_or]
+          constructor
+          rw [← Nat.succ_eq_add_one, ← Nat.add_succ, ← hdP, ← leadingCoeff]
+          exact mt leadingCoeff_eq_zero.mp hpz
+          exact hη
+        -- the product is one degree higher than P
+        have h₃ := eraseLead_natDegree_of_nextCoeff h₂
+        -- prove equality by showing all the coefficients are equal
+        apply Polynomial.ext; intro n
+        -- divide into three cases: low degree, degree equal to P, or higher than P
+        rcases Nat.lt_or_ge n (natDegree P) with hn | hn
+        case _ => { --n < natDegree P
+          rw [← self_sub_monomial_natDegree_leadingCoeff, coeff_sub, coeff_monomial]
+          have : natDegree (eraseLead ((X - C η) * P)) ≠ n := by apply ne_of_gt; linarith
+          rw [if_neg this]
+          rw [← self_sub_monomial_natDegree_leadingCoeff, coeff_sub, coeff_monomial]
+          have : natDegree ((X - C η) * P) ≠ n := by apply ne_of_gt; linarith
+          rw [if_neg this]
+          rw [← self_sub_monomial_natDegree_leadingCoeff, mul_sub, coeff_sub]
+          --dunno the name of the right cancellation lemma here
+          suffices coeff ((X - C η) * (monomial (natDegree P)) (leadingCoeff P)) n = 0 by linarith
+          cases hn2 : n
+          case zero =>
+            rw [mul_coeff_zero]
+            apply mul_eq_zero_of_right
+            rw [coeff_monomial]
+            split; by_contra; linarith
+            rfl
+          case succ n2 =>
+            have : (natDegree P) ≠ n2.succ := hn2 ▸ ne_of_gt hn
+            rw [mul_comm, coeff_mul_X_sub_C, coeff_monomial, coeff_monomial, if_neg this, zero_mul]
+            split; by_contra; linarith
+            exact sub_zero 0
+        }
+        case _ => { --n ≥ natDegree P
+          have h₄ : natDegree (eraseLead (eraseLead ((X - C η) * P))) < n := by
+            calc natDegree (eraseLead (eraseLead ((X - C η) * P)))
+              _ ≤ natDegree (eraseLead ((X - C η) * P)) - 1 := eraseLead_natDegree_le (eraseLead ((X - C η) * P))
+              _ ≤ (natDegree ((X - C η) * P) - 1) - 1 := Nat.sub_le_sub_right (eraseLead_natDegree_le ((X - C η) * P)) 1
+              _ = (natDegree P + 1) - 2 := by rw [h₁]; norm_num
+              _ < natDegree P := by rw [hdP]; norm_num
+              _ ≤ n := hn
+          have h₅ : natDegree ((X - C η) * (eraseLead P)) < n := by calc
+            natDegree ((X - C η) * (eraseLead P)) = 1 + natDegree (eraseLead P) := by
+                rw [natDegree_mul (X_sub_C_ne_zero η), natDegree_X_sub_C]; rwa [ne_eq]
+            _ ≤ 1 + (natDegree P - 2) := (add_le_add_iff_left 1).mpr (eraseLead_natDegree_of_zero_nextCoeff h)
+            _ < natDegree P := by rw [hdP, add_comm]; norm_num;
+            _ ≤ n := hn
+          rw [coeff_eq_zero_of_natDegree_lt h₄, coeff_eq_zero_of_natDegree_lt h₅]
+        }
+      }
+    }
+
+--Technically this is true as long as sign(P.leadingCoeff) = sign(P.nextCoeff)
+lemma signvar_X_sub_C_ge_eraseLead_of_nextCoeff_nz (h₁ : leadingCoeff P > 0) (h₂ : nextCoeff P > 0) :
+  sign_variations ((X - C η) * P) ≥ sign_variations ((X - C η) * (eraseLead P)) := by
+    --basic facts
+    have hpne0 : P ≠ 0 :=
+      (leadingCoeff_ne_zero.mp (ne_of_gt h₁))
+    have hxpn0 : (X - C η) * P ≠ 0 :=
+      mul_ne_zero (X_sub_C_ne_zero η) hpne0
+    have hndxp : natDegree ((X - C η) * P) = natDegree P + 1 := by
+      rw [natDegree_mul (X_sub_C_ne_zero η) hpne0, natDegree_X_sub_C, add_comm]
+    have hndep : natDegree P = natDegree (eraseLead P) + 1 :=
+      eraseLead_natDegree_of_nextCoeff (ne_of_gt h₂)
+    have hxepn0 : (X - C η) * (eraseLead P) ≠ 0 :=
+      mul_ne_zero (X_sub_C_ne_zero η) (ne_zero_eraseLead_of_nz_nextCoeff (ne_of_gt h₂))
+    have hndxep : natDegree ((X - C η) * eraseLead P) = natDegree (eraseLead P) + 1 := by
+      rw [natDegree_mul (mul_ne_zero_iff.mp hxepn0).1 (mul_ne_zero_iff.mp hxepn0).2, natDegree_X_sub_C, add_comm]
+
+    have heqc : ∃(c₀ : α) (cs : List α),
+      coeffList ((X - C η) * P) = (leadingCoeff P)::c₀::cs ∧
+      coeffList ((X - C η) * (eraseLead P)) = (nextCoeff P)::cs := by
+        obtain ⟨dp1, hdp1⟩ := Nat.exists_eq_add_of_lt (natDegree_pos_of_nz_nextCoeff (ne_of_gt h₂))
+        obtain ⟨n0, hn0⟩ := coeffList_eraseLead hxepn0
+        use nextCoeff ((X - C η) * P)
+        use (List.replicate n0 0 ++ coeffList (eraseLead ((X - C η) * eraseLead P)))
+        constructor
+        case left =>
+          have hl0 := calc natDegree P.eraseLead + 2
+            _ = (coeffList ((X - C η) * P.eraseLead)).length := by
+              simp only [length_coeffList, hxepn0, ite_false, hndxep]
+            _ = (leadingCoeff ((X - C η) * eraseLead P) :: (List.replicate n0 0 ++ coeffList (eraseLead ((X - C η) * eraseLead P)))).length := by
+              rw [hn0]
+            _ = n0 + (coeffList (eraseLead ((X - C η) * P.eraseLead))).length + 1 := by
+              rw [List.length_cons, List.length_append, List.length_replicate]
+          by_cases hnxp : nextCoeff ((X - C η) * P) = 0
+          case pos =>
+            suffices eraseLead ((X - C η) * P) = eraseLead ((X - C η) * (eraseLead P)) by
+              obtain ⟨n1, hn1⟩ := coeffList_eraseLead hxpn0
+              have hn0n1 : n1 = n0 + 1 := by
+                have hl1 := calc natDegree P + 2
+                  _ = (coeffList ((X - C η) * P)).length := by
+                    simp only [length_coeffList, mul_eq_zero, X_sub_C_ne_zero η, hpne0, or_self, ite_false, hndxp]
+                  _ = (leadingCoeff ((X - C η) * P) :: (List.replicate n1 0 ++ coeffList (eraseLead ((X - C η) * P)))).length := by
+                    rw [hn1]
+                  _ = n1 + (coeffList (eraseLead ((X - C η) * P))).length + 1 := by
+                    rw [List.length_cons, List.length_append, List.length_replicate]
+                rw [this, hndep] at hl1
+                linarith
+              rw [hn1, this, hnxp, hn0n1]
+              rw [leadingCoeff_mul, leadingCoeff_X_sub_C, one_mul, List.replicate_succ, List.cons_append]
+            rw [← self_sub_monomial_natDegree_leadingCoeff, hndxp, leadingCoeff_monic_mul (monic_X_sub_C η)]
+            rw [← self_sub_monomial_natDegree_leadingCoeff, hndxep, ← hndep, leadingCoeff_monic_mul (monic_X_sub_C η)]
+            rw [← leadingCoeff_eraseLead_eq_nextCoeff (ne_of_gt h₂)]
+            rw [← self_sub_monomial_natDegree_leadingCoeff]
+            rw [mul_sub, sub_mul, sub_mul, ← sub_add, X_mul_monomial]
+            suffices C η * monomial P.natDegree P.leadingCoeff = monomial P.natDegree P.nextCoeff by
+              rw [this]
+              ring
+            rw [nextCoeff_of_pos_natDegree _ (hndxp ▸ P.natDegree.succ_pos), hndxp, mul_comm,
+              Nat.add_sub_cancel, hdp1, coeff_mul_X_sub_C] at hnxp
+            rw [leadingCoeff, nextCoeff_of_pos_natDegree _ (hndep ▸ P.eraseLead.natDegree.succ_pos),
+              hdp1, C_mul_monomial, mul_comm η, ← eq_of_sub_eq_zero hnxp, Nat.add_sub_cancel]
+          case neg =>
+            suffices eraseLead (eraseLead ((X - C η) * P)) = eraseLead ((X - C η) * (eraseLead P)) by
+              obtain hn1 := coeffList_eraseLead_nz hnxp
+              obtain ⟨n2, hn2⟩ := coeffList_eraseLead (ne_zero_eraseLead_of_nz_nextCoeff hnxp)
+              have hndep2 : natDegree P = natDegree (eraseLead P) + 1 :=
+                eraseLead_natDegree_of_nextCoeff (ne_of_gt h₂)
+              have hn0n2 : n2 = n0 := by
+                have hl2 := calc natDegree P + 2
+                  _ = (coeffList ((X - C η) * P)).length := by
+                    simp only [length_coeffList, mul_eq_zero, X_sub_C_ne_zero η, hpne0, or_self, ite_false, hndxp]
+                  _ = _ := by rw [hn1, hn2]
+                  _ = n2 + (coeffList (eraseLead (eraseLead ((X - C η) * P)))).length + 2 := by
+                    rw [List.length_cons, List.length_cons, List.length_append, List.length_replicate]
+                rw [this, hndep] at hl2
+                linarith
+              rw [hn1, hn2, this, hn0n2]
+              rw [leadingCoeff_mul, leadingCoeff_X_sub_C, one_mul]
+              rw [leadingCoeff_eraseLead_eq_nextCoeff hnxp]
+            have hndexp : natDegree (eraseLead ((X - C η) * P)) = natDegree P :=
+              Nat.add_right_cancel (eraseLead_natDegree_of_nextCoeff hnxp ▸ hndxp)
+            rw [← self_sub_monomial_natDegree_leadingCoeff, hndexp, ← leadingCoeff_eraseLead_eq_nextCoeff hnxp,
+                ]
+            rw [← self_sub_monomial_natDegree_leadingCoeff, hndxp, leadingCoeff_monic_mul (monic_X_sub_C η)]
+            rw [← self_sub_monomial_natDegree_leadingCoeff, hndxep, ← hndep, leadingCoeff_monic_mul (monic_X_sub_C η)]
+            rw [← leadingCoeff_eraseLead_eq_nextCoeff (ne_of_gt h₂)]
+            rw [← self_sub_monomial_natDegree_leadingCoeff]
+            rw [mul_sub, sub_mul _ _ (monomial _ _), X_mul_monomial]
+            suffices monomial P.natDegree ((X - C η)*P).nextCoeff =
+              monomial P.natDegree P.nextCoeff - C η * monomial P.natDegree P.leadingCoeff by
+              rw [this]
+              ring
+            rw [C_mul_monomial]
+            rw [← monomial_sub]
+            congr
+            rw [nextCoeff_of_pos_natDegree _ (hndxp ▸ P.natDegree.succ_pos)]
+            rw [leadingCoeff, nextCoeff_of_pos_natDegree _ (hndep ▸ P.eraseLead.natDegree.succ_pos)]
+            rw [hndxp, mul_comm, Nat.add_sub_cancel, hdp1, Nat.add_sub_cancel, coeff_mul_X_sub_C]
+            ring
+        case right =>
+          rw [hn0]
+          congr
+          rw [leadingCoeff_mul, leadingCoeff_X_sub_C, one_mul]
+          exact (leadingCoeff_eraseLead_eq_nextCoeff (ne_of_gt h₂)).symm
+    rcases heqc with ⟨c₀,cs,⟨hcs,hecs⟩⟩
+    dsimp [sign_variations]
+    rw [hcs, hecs]
+    simp only [List.destutter, decide_not, List.map_cons, h₁, sign_pos,
+      decide_False, List.filter_cons_of_pos, sign_eq_zero_iff, Bool.not_eq_true',
+      not_not, h₂, tsub_le_iff_right]
+    have : ((List.filter (fun x => !decide (x = 0)) (SignType.sign c₀ :: List.map SignType.sign cs)
+        ).destutter' (·≠·) 1).length  ≥ 1 := List.destutter'_length_pos _ (·≠·)
+    rw [Nat.sub_add_cancel this]
+    rw [List.filter]; split --split on whether c₀ = 0 or not.
+    swap; next => rfl --if c₀ = 0, the trailing nonzero coefficient lists are identical.
+    next hc₀0 =>
+      rw [List.destutter']; split --split on whether SignType.sign c₀ = 1 or not.
+      swap; next => rfl --if sign c₀ = 1, the destutter doesn't care about it.
+      next hc₀1 =>
+        have hc₀2 : SignType.sign c₀ = -1 := by cases h : SignType.sign c₀ <;> simp_all
+        apply ge_iff_le.mp
+        simp only [← ne_eq]
+        rw [← List.destutter_cons' , ← List.destutter_cons']
+        cases hr : List.filter (fun x => !decide (x = 0)) (List.map (⇑SignType.sign) cs)
+        case nil => simp [Nat.le_succ 1]
+        case cons r rs =>
+          rw [List.destutter_cons_cons, List.destutter_cons_cons]
+          split
+          next h₃ =>
+            have h₃ : r = 1 := by
+              cases r
+              case pos => trivial
+              case zero =>
+                have : SignType.zero ∈ SignType.zero :: rs := List.mem_cons.mpr (Or.inl rfl)
+                rw [← hr] at this
+                replace this := List.of_mem_filter this
+                simp at this
+              case neg =>
+                rw [hc₀2] at h₃
+                simp at h₃
+            simp only [ne_eq, h₃, List.length_cons, not_true_eq_false, ite_false]
+            exact Nat.le_trans (Nat.le_succ _) (Nat.le_succ _)
+          next h₃ =>
+            have h₄ : 1 ≠ r := by cases h : r <;> simp_all
+            simp only [List.length_cons, if_pos h₄]
+            apply (not_not.mp h₃).symm |> not_not.mpr |> List.length_destutter'_eq _ _ Ne.Coequivalence |> Nat.le_of_eq |> Nat.succ_le_succ
+
 /-- Multiplying by (X-η) adds at least one sign change -/
 theorem succ_sign_lin_mul (hη : η > 0) {d : ℕ} (hq : Q ≠ 0) (hd : d = Q.natDegree):
   sign_variations ((X - C η) * Q) >= sign_variations Q + 1 := by
@@ -209,7 +492,7 @@ theorem succ_sign_lin_mul (hη : η > 0) {d : ℕ} (hq : Q ≠ 0) (hd : d = Q.na
           leadingCoeff_eraseLead_eq_nextCoeff h_nc_nz
 
         have h_eLQ : sign_variations ((X - C η) * Q) ≥ sign_variations ((X - C η) * (eraseLead Q)) := by
-          apply signvar_X_sub_C_ge_eraseLead_of_nextCoeff_nz Q h_nc_nz hη hqpos
+          apply signvar_X_sub_C_ge_eraseLead_of_nextCoeff_nz Q hqpos
           apply sign_eq_one_iff.mp
           rw [← hsq1, hcsq1]
           exact SignType.pos_eq_one

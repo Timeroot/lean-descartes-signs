@@ -159,7 +159,7 @@ theorem length_destutter'_eq (hr : Coequivalence Rα) (hab : ¬Rα a b) : (List.
 
 /-- Destutter' on a relation like ≠, whose negation is an equivalence, has length
     monotonic under List.cons --/
-theorem length_destutter'_ge_length_destutter'_cons (hr : Coequivalence Rα) :
+theorem length_destutter'_ge_length_destutter'_cons (hr : Coequivalence Rα) (a b : α):
   (List.destutter' Rα a (b::l)).length ≥ (List.destutter' Rα b l).length := by
     cases l with
     | nil => by_cases hab : (Rα a b) <;> simp_all [Nat.le_succ]
@@ -180,7 +180,7 @@ theorem length_destutter'_ge_length_destutter'_cons (hr : Coequivalence Rα) :
     monotonic under List.cons --/
 theorem length_destutter_cons_ge_length_destutter (hr : Coequivalence Rα) :
   ((a::l).destutter Rα).length ≥ (l.destutter Rα).length := by
-    cases l <;> simp [destutter]; exact length_destutter'_ge_length_destutter'_cons _ Rα hr
+    cases l <;> simp [destutter]; exact length_destutter'_ge_length_destutter'_cons _ Rα hr _ _
 
 /-- `destutter ≠` has length monotonic under List.cons --/
 theorem length_destutter_ne_cons_ge_length_destutter [DecidableEq α]:
@@ -347,6 +347,9 @@ end List
 namespace Polynomial
 variable {α : Type*} [Semiring α] {P : Polynomial α}
 
+--Section names here suggest what file they could go in, in Mathlib
+section Polynomial_Coeff
+
 theorem card_support_mul (P Q : Polynomial α) : (P*Q).support.card ≤ P.support.card * Q.support.card := by
   calc (P * Q).support.card
    _ = (P.toFinsupp * Q.toFinsupp).support.card := by rw [← support_toFinsupp, toFinsupp_mul]
@@ -359,23 +362,18 @@ theorem card_support_mul (P Q : Polynomial α) : (P*Q).support.card ≤ P.suppor
     intro _ _
     exact (Finset.card_singleton _) ▸ le_rfl
 
---There's several theorems upper-bounding the P.eraseLead.support.card in terms of P.support.card, but none going
--- other way!
-theorem eraseLead_card_support_one (h : P ≠ 0) :
-  P.eraseLead.support.card + 1 = P.support.card := by
-    set c := P.support.card with hc
-    cases h₁ : c
-    case zero => by_contra; exact h (card_support_eq_zero.mp h₁);
-    case succ => exact Nat.succ_inj'.mpr (eraseLead_card_support' (hc ▸ h₁))
+end Polynomial_Coeff
 
-theorem card_support_eq_one_of_eraseLead_zero (h₀ : P ≠ 0) (h₁ : eraseLead P = 0) : P.support.card = 1 :=
-  (card_support_eq_zero.mpr h₁ ▸ eraseLead_card_support_one h₀).symm
+section Polynomial_Basic
 
-theorem card_support_lt_one_of_eraseLead_zero (h : eraseLead P = 0) : P.support.card ≤ 1 := by
-  by_cases hpz : P = 0
-  case pos => simp [hpz]
-  case neg => exact le_of_eq (card_support_eq_one_of_eraseLead_zero hpz h)
+variable [Ring R] {p q : R[X]}
 
+theorem monomial_sub (n : ℕ) (r s : R) : monomial n (r - s) = monomial n r - monomial n s := by
+  rw [← C_mul_X_pow_eq_monomial, ← C_mul_X_pow_eq_monomial, ← C_mul_X_pow_eq_monomial, C_sub, sub_mul]
+
+end Polynomial_Basic
+
+section Polynomial_Degree
 
 theorem natDegree_nz_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P ≠ 0 := by
   rw [nextCoeff] at h
@@ -387,6 +385,25 @@ theorem natDegree_pos_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P > 0 
 
 theorem ne_zero_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : P ≠ 0 :=
   ne_zero_of_natDegree_gt (natDegree_pos_of_nz_nextCoeff h)
+
+variable {α : Type*} [DivisionSemiring α] (P : Polynomial α) [DecidableEq α]
+
+/-- Over a division semiring, multiplying a polynomial by a nonzero constant leaves the degree unchanged. -/
+@[simp]
+theorem natDegree_mul_of_nonzero {η : α} (hη : η ≠ 0) : natDegree (C η * P) = natDegree P := by
+  by_cases h : (P = 0)
+  next P0 => simp only [h, mul_zero, natDegree_zero]
+  next Pn0 =>
+    rw [← zero_add P.natDegree, ← natDegree_C η]
+    apply natDegree_mul'
+    simp only [leadingCoeff_C, ne_eq, mul_eq_zero, leadingCoeff_eq_zero]
+    intro hPη0; cases hPη0
+    next η0 => exact hη η0
+    next h0 => exact h h0
+
+end Polynomial_Degree
+
+section Polynomial_Eraselead
 
 theorem eraseLead_natDegree_of_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P = natDegree (eraseLead P) + 1 := by
   have hpos := natDegree_pos_of_nz_nextCoeff h
@@ -409,6 +426,23 @@ theorem natDegree_pos_of_eraseLead_nz (h : eraseLead P ≠ 0) : natDegree P > 0 
   by_contra h₂
   rw [eq_C_of_natDegree_eq_zero (Nat.eq_zero_of_not_pos h₂)] at h
   simp at h
+
+--There's several theorems upper-bounding the P.eraseLead.support.card in terms of P.support.card, but none going
+-- other way!
+theorem eraseLead_card_support_one (h : P ≠ 0) :
+  P.eraseLead.support.card + 1 = P.support.card := by
+    set c := P.support.card with hc
+    cases h₁ : c
+    case zero => by_contra; exact h (card_support_eq_zero.mp h₁);
+    case succ => exact Nat.succ_inj'.mpr (eraseLead_card_support' (hc ▸ h₁))
+
+theorem card_support_eq_one_of_eraseLead_zero (h₀ : P ≠ 0) (h₁ : eraseLead P = 0) : P.support.card = 1 :=
+  (card_support_eq_zero.mpr h₁ ▸ eraseLead_card_support_one h₀).symm
+
+theorem card_support_lt_one_of_eraseLead_zero (h : eraseLead P = 0) : P.support.card ≤ 1 := by
+  by_cases hpz : P = 0
+  case pos => simp [hpz]
+  case neg => exact le_of_eq (card_support_eq_one_of_eraseLead_zero hpz h)
 
 theorem eraseLead_natDegree_of_zero_nextCoeff (h : nextCoeff P = 0) : natDegree P - 2 ≥ natDegree (eraseLead P) := by
   -- If eraseLead P = 0, it's trivial.
@@ -461,6 +495,9 @@ theorem leadingCoeff_eraseLead_eq_nextCoeff (h : nextCoeff P ≠ 0) : nextCoeff 
 theorem ne_zero_eraseLead_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : eraseLead P ≠ 0 :=
   leadingCoeff_ne_zero.mp (leadingCoeff_eraseLead_eq_nextCoeff h ▸ h)
 
+end Polynomial_Eraselead
+
+-- Start: coeffList, and its properties. --
 variable {α : Type*} [Semiring α] {P : Polynomial α} [DecidableEq α]
 
 /-- A list of coefficients starting from the leading term down to the constant term. -/
@@ -489,6 +526,7 @@ theorem coeffList_eq_cons_leadingCoeff (h : P ≠ 0) : ∃(ls : List α), coeffL
 theorem length_coeffList (P : Polynomial α) : (coeffList P).length = if (P=0) then 0 else P.natDegree+1 := by
   by_cases P = 0 <;> simp_all [coeffList]
 
+/-- If the `nextCoeff P ≠ 0`, then the tail of `P.coeffList` is `coeffList P.eraseLead`.-/
 theorem coeffList_eraseLead_nz (h : nextCoeff P ≠ 0) : coeffList P = (leadingCoeff P)::(coeffList (eraseLead P)) := by
   have hd : natDegree P = natDegree (eraseLead P) + 1 := eraseLead_natDegree_of_nextCoeff h
   have hpz : P ≠ 0 := ne_zero_of_nz_nextCoeff h
@@ -509,6 +547,7 @@ theorem coeffList_eraseLead_nz (h : nextCoeff P ≠ 0) : coeffList P = (leadingC
   apply Polynomial.eraseLead_coeff_of_ne
   linarith
 
+/- Coefficients of P are always the leading coefficient, some number of zeros, and then `coeffList P.eraseLead`. -/
 theorem coeffList_eraseLead (h : P≠0) : ∃(n:ℕ), coeffList P = (leadingCoeff P)::((List.replicate n 0)++(coeffList (eraseLead P))) := by
   by_cases hdp : natDegree P = 0
   case pos =>
@@ -653,20 +692,7 @@ theorem coeffList_neg : (coeffList (-P)) = (coeffList P).map (λx↦-x) := by
 
 variable {α : Type*} [DivisionSemiring α] (P : Polynomial α) [DecidableEq α]
 
-/-- Over a division semiring, multiplying a polynomial by a nonzero constant leaves the degree unchanged. -/
-@[simp]
-theorem natDegree_mul_of_nonzero {η : α} (hη : η ≠ 0) : natDegree (C η * P) = natDegree P := by
-  by_cases h : (P = 0)
-  next P0 => simp only [h, mul_zero, natDegree_zero]
-  next Pn0 =>
-    rw [← zero_add P.natDegree, ← natDegree_C η]
-    apply natDegree_mul'
-    simp only [leadingCoeff_C, ne_eq, mul_eq_zero, leadingCoeff_eq_zero]
-    intro hPη0; cases hPη0
-    next η0 => exact hη η0
-    next h0 => exact h h0
-
-/-- Over a division semiring, multiplying a polynomial by a nonzero constant multiplies the coefficients. -/
+/-- Over a division semiring, multiplying a polynomial by a nonzero constant multiplies the coefficient list. -/
 theorem coeffList_mul_C {η : α} (hη : η ≠ 0) :
   coeffList (C η * P) = (coeffList P).map (λx↦η*x) := by
     by_cases hp : P = 0
