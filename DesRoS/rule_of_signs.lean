@@ -206,8 +206,6 @@ lemma signvar_X_sub_C_ge_eraseLead_of_nextCoeff_nz (h₁ : leadingCoeff P > 0) (
             suffices eraseLead (eraseLead ((X - C η) * P)) = eraseLead ((X - C η) * (eraseLead P)) by
               obtain hn1 := coeffList_eraseLead_nz hnxp
               obtain ⟨n2, hn2⟩ := coeffList_eraseLead (ne_zero_eraseLead_of_nz_nextCoeff hnxp)
-              have hndep2 : natDegree P = natDegree (eraseLead P) + 1 :=
-                eraseLead_natDegree_of_nextCoeff (ne_of_gt h₂)
               have hn0n2 : n2 = n0 := by
                 have hl2 := calc natDegree P + 2
                   _ = (coeffList ((X - C η) * P)).length := by
@@ -463,7 +461,6 @@ theorem succ_sign_lin_mul (hη : η > 0) {d : ℕ} (hq : Q ≠ 0) (hd : d = Q.na
         have h_eLQ2 : sign_variations (eraseLead ((X - C η) * Q)) = sign_variations ((X - C η) * (eraseLead Q)):= by
           apply signvar_ereaseLead_mul_XC_eq_XC_mul_eraseLead Q hη hqpos
           exact sign_eq_neg_one_iff.mp (SignType.neg_eq_neg_one ▸ hcsq1 ▸ hsq1)
-          exact sign_eq_one_iff.mp (h_sq0_pos ▸ h_sq0_sηq0 ▸ hsηq0)
 
         have h_ind : sign_variations ((X - C η) * (eraseLead Q)) ≥ sign_variations (eraseLead Q) + 1 := by
           exact ih (natDegree (eraseLead Q)) hnDeQ h_eQ_nz rfl
