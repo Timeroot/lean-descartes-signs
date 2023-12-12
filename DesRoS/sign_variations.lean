@@ -52,9 +52,8 @@ lemma sign_var_eq_sign_var_mul_pos (hη : η > 0) : sign_variations (C η * P) =
     rw [← List.comp_map]
     congr 2; funext; simp [hη, sign_mul]
 
-
 /-- The number of sign changes does not change if we negate -/
-lemma sign_var_eq_sign_var_neg : sign_variations (-P) = sign_variations P := by
+theorem sign_var_eq_sign_var_neg : sign_variations (-P) = sign_variations P := by
     dsimp [sign_variations]
     rw [coeffList_neg]
     congr 1
@@ -85,7 +84,7 @@ theorem sign_var_eq_sign_var_mul (hη : η ≠ 0) :
 
 /-- If the first two signs are the same, then sign_variations is unchanged by eraseLead -/
 theorem sign_var_eq_eraseLead_of_eq_sign (h : SignType.sign (leadingCoeff P) = SignType.sign (nextCoeff P)) :
-  sign_variations P = sign_variations (eraseLead P) := by
+  sign_variations P = sign_variations P.eraseLead := by
   by_cases hpz : (P = 0)
   case pos => simp_all
   have : leadingCoeff P ≠ 0 := by simp_all
@@ -97,8 +96,8 @@ theorem sign_var_eq_eraseLead_of_eq_sign (h : SignType.sign (leadingCoeff P) = S
 
 /-- If we drop the leading coefficient, the sign changes by 0 or 1 depending on whether it matches
     leading coefficient of eraseLead. -/
-theorem sign_var_eq_eraseLead_ite {P : Polynomial α} (h : P ≠ 0) : sign_variations P = sign_variations (eraseLead P) +
-  if SignType.sign (leadingCoeff P) = -SignType.sign (leadingCoeff (eraseLead P)) then 1 else 0
+theorem sign_var_eq_eraseLead_ite {P : Polynomial α} (h : P ≠ 0) : sign_variations P = sign_variations P.eraseLead +
+  if SignType.sign (leadingCoeff P) = -SignType.sign (leadingCoeff P.eraseLead) then 1 else 0
  := by
   by_cases hpz : P = 0
   case pos => simp_all
@@ -108,7 +107,7 @@ theorem sign_var_eq_eraseLead_ite {P : Polynomial α} (h : P ≠ 0) : sign_varia
   rw [hc, List.map_cons, List.map_append, List.map_replicate, List.filter, decide_eq_true hsl]
   simp only [decide_not, lt_self_iff_false, sign_zero, List.filter_append, List.filter_replicate]
   simp only [decide_True, Bool.not_true, ite_false, List.nil_append]
-  cases hcep : (coeffList (eraseLead P))
+  cases hcep : (coeffList P.eraseLead)
   case neg.intro.nil =>
     have : eraseLead P = 0 := coeffList_nil hcep
     simp_all
@@ -130,7 +129,7 @@ theorem sign_var_eq_eraseLead_ite {P : Polynomial α} (h : P ≠ 0) : sign_varia
       by_contra h; revert hcep
       rw [h, coeffList_zero]
       simp
-    have hc4 : c = leadingCoeff (eraseLead P) := by
+    have hc4 : c = leadingCoeff P.eraseLead := by
       obtain ⟨ls,hls⟩ := coeffList_eq_cons_leadingCoeff hel
       cases (hcep ▸ hls); rfl
     by_cases hc3 : SignType.sign (leadingCoeff P) = SignType.sign c
@@ -140,22 +139,22 @@ theorem sign_var_eq_eraseLead_ite {P : Polynomial α} (h : P ≠ 0) : sign_varia
       have hc5 : SignType.sign (leadingCoeff P) = -SignType.sign c := by
         cases hc6 : SignType.sign c <;> cases hl2 : SignType.sign (leadingCoeff P) <;> simp_all
       rw [if_pos hc3, ← hc4, if_pos hc5]
-      rw [← Nat.sub_add_of_ge (List.destutter'_length_pos _ _)]
+      rw [Nat.sub_add_cancel (List.destutter'_length_pos _ _)]
       simp
 
 /-- We can only lose, not gain, sign changes if we drop the leading coefficient -/
-theorem sign_var_ge_eraseLead : sign_variations P ≥ sign_variations (eraseLead P) := by
+theorem sign_var_ge_eraseLead : sign_variations P ≥ sign_variations P.eraseLead := by
   by_cases hpz : P = 0
   case pos => simp_all
   have := sign_var_eq_eraseLead_ite hpz
-  by_cases SignType.sign (leadingCoeff P) = -SignType.sign (leadingCoeff (eraseLead P)) <;> simp_all
+  by_cases SignType.sign P.leadingCoeff = -SignType.sign P.eraseLead.leadingCoeff <;> simp_all
 
 /-- We can only lose at most one sign changes if we drop the leading coefficient -/
-theorem sign_var_le_eraseLead_succ : sign_variations P ≤ sign_variations (eraseLead P) + 1 := by
+theorem sign_var_le_eraseLead_succ : sign_variations P ≤ sign_variations P.eraseLead + 1 := by
   by_cases hpz : P = 0
   case pos => simp_all
   have := sign_var_eq_eraseLead_ite hpz
-  by_cases SignType.sign (leadingCoeff P) = -SignType.sign (leadingCoeff (eraseLead P)) <;> simp_all
+  by_cases SignType.sign P.leadingCoeff = -SignType.sign P.eraseLead.leadingCoeff <;> simp_all
 
 end field
 

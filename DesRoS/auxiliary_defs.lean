@@ -70,12 +70,9 @@ theorem coequiv_pos_of_neg_pos (hc : Coequivalence r) (hxy : ¬r y x) (hxz: r x 
 
 end Relation
 
-
-
--- Surely this is somewhere else and I'm just missing it, TODO
 namespace Nat
-theorem sub_add_of_ge {n : ℕ} (hn : n > 0) : n = n - 1 + 1 := by cases n <;> simp_all
-
+--TODO: this is now tsub_tsub_eq_add_tsub_of_le, see
+--  https://leanprover.zulipchat.com/#narrow/stream/113489-new-members/topic/Looking.20for.20a.20Nat.20theorem
 theorem sub_sub_of_ge {a b c : ℕ} (h : b ≥ c) : a - (b - c) = a + c - b := by
   obtain ⟨b, rfl⟩ := exists_add_of_le h
   rw [Nat.add_sub_self_left]
@@ -305,44 +302,7 @@ theorem length_destutter_maximal_chain_neg_trans [DecidableEq α] {n : ℕ} (h�
                     case h₁ => exact hos ▸ sublist_of_cons_sublist_cons (hl₂ ▸ h₁)
                   }
 
--- /-- Destuttering a relation like ≠, whose negation is a transitive property, effectively breaks
--- the original list into several chunks with the following properties:
---  * Each chunk is pairwise = (or ¬R)
---  * The concatenation of the chunks is the original list
---  * Each chunk is nonempty
---  * The destutter takes the first element of each
--- -/
--- theorem destutter'_neg_is_chunks [DecidableEq α] : ℕ := sorry
---   ∃c:List (List α), (destutter (·≠·) l = (c.map (λls↦List.get ls 1))) := by
---   sorry
--- nope, didn't end up writing that proof
-
--- it typechecks but it's garbage
--- /-- (a::l).get n = l.get (n-1), as long as n≠0. -/
--- theorem get_cons_pos {l : List α} {n : Nat} (hp : n ≠ 0) (hl : n ≤ l.length) :
---   (a :: l).get ⟨n, by rw [length_cons]; exact Nat.lt_succ.2 hl⟩
---   = l.get ⟨n-1, Nat.lt_of_lt_of_le (Nat.pred_lt hp) hl⟩ := by
---     suffices get ([a]++l) ⟨n, by simp; exact Nat.lt_succ.2 hl⟩ =
---       get l ⟨n-1, Nat.lt_of_lt_of_le (Nat.pred_lt hp) hl⟩ by
---       simp at this
---       exact this
---     rw [List.get_append_right]; rfl
---     rw [length_singleton]
---     intro hn
---     have := Nat.le_sub_one_of_lt hn
---     simp only [ge_iff_le, le_refl, tsub_eq_zero_of_le, nonpos_iff_eq_zero] at this
---     exact hp this
-
 end List
-
--- theorem sign_trichotomy_pos {c : SignType} (h₁ : c ≠ 0) (h₂ : ¬c > 0) : c = SignType.neg := by
---   cases c <;> simp_all
-
--- theorem sign_trichotomy_neg {c : SignType} (h₁ : c ≠ 0) (h₂ : ¬c < 0) : c = SignType.pos := by
---   cases c <;> simp_all
-
--- theorem sign_trichotomy_zero {c : SignType} (h₁ : ¬c < 0) (h₂ : ¬c > 0) : c = SignType.zero := by
---   cases c <;> simp_all
 
 namespace Polynomial
 variable {α : Type*} [Semiring α] {P : Polynomial α}
@@ -375,23 +335,23 @@ end Polynomial_Basic
 
 section Polynomial_Degree
 
-theorem natDegree_nz_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P ≠ 0 := by
+theorem natDegree_nz_of_nz_nextCoeff (h : P.nextCoeff ≠ 0) : P.natDegree ≠ 0 := by
   rw [nextCoeff] at h
-  by_cases hpz : (natDegree P = 0) <;> simp_all only [ne_eq, zero_le, ite_true, ite_false, not_true_eq_false]
+  by_cases hpz : P.natDegree = 0 <;> simp_all only [ne_eq, zero_le, ite_true, ite_false, not_true_eq_false]
   trivial
 
-theorem natDegree_pos_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P > 0 :=
+theorem natDegree_pos_of_nz_nextCoeff (h : P.nextCoeff ≠ 0) : P.natDegree > 0 :=
   Nat.zero_lt_of_ne_zero (natDegree_nz_of_nz_nextCoeff h)
 
-theorem ne_zero_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : P ≠ 0 :=
+theorem ne_zero_of_nz_nextCoeff (h : P.nextCoeff ≠ 0) : P ≠ 0 :=
   ne_zero_of_natDegree_gt (natDegree_pos_of_nz_nextCoeff h)
 
 variable {α : Type*} [DivisionSemiring α] (P : Polynomial α) [DecidableEq α]
 
 /-- Over a division semiring, multiplying a polynomial by a nonzero constant leaves the degree unchanged. -/
 @[simp]
-theorem natDegree_mul_of_nonzero {η : α} (hη : η ≠ 0) : natDegree (C η * P) = natDegree P := by
-  by_cases h : (P = 0)
+theorem natDegree_mul_of_nonzero {η : α} (hη : η ≠ 0) : natDegree (C η * P) = P.natDegree := by
+  by_cases h : P = 0
   next P0 => simp only [h, mul_zero, natDegree_zero]
   next Pn0 =>
     rw [← zero_add P.natDegree, ← natDegree_C η]
@@ -405,24 +365,24 @@ end Polynomial_Degree
 
 section Polynomial_Eraselead
 
-theorem eraseLead_natDegree_of_nextCoeff (h : nextCoeff P ≠ 0) : natDegree P = natDegree (eraseLead P) + 1 := by
+theorem eraseLead_natDegree_of_nextCoeff (h : P.nextCoeff ≠ 0) : P.natDegree = P.eraseLead.natDegree + 1 := by
   have hpos := natDegree_pos_of_nz_nextCoeff h
-  suffices natDegree P - 1 ≤ natDegree (eraseLead P) by
+  suffices P.natDegree - 1 ≤ P.eraseLead.natDegree by
     have := (add_le_add_iff_right 1).mpr this
-    rw [← Nat.sub_add_of_ge hpos] at this
-    have : natDegree P ≥ natDegree (eraseLead P) + 1 := by
+    rw [Nat.sub_add_cancel hpos] at this
+    have : P.natDegree ≥ P.eraseLead.natDegree + 1 := by
       have := eraseLead_natDegree_le P;
-      have : natDegree (eraseLead P) + 1 ≤ (natDegree P - 1) + 1 := (add_le_add_iff_right 1).mpr this
-      rwa [← Nat.sub_add_of_ge hpos] at this
+      have : P.eraseLead.natDegree + 1 ≤ (P.natDegree - 1) + 1 := (add_le_add_iff_right 1).mpr this
+      rwa [Nat.sub_add_cancel hpos] at this
     linarith
-  have : coeff P (natDegree P - 1) = coeff (eraseLead P) (natDegree P - 1) := by
+  have : coeff P (P.natDegree - 1) = coeff P.eraseLead (P.natDegree - 1) := by
     apply Eq.symm
     apply eraseLead_coeff_of_ne
     exact Nat.pred_ne_self (Nat.ne_zero_iff_zero_lt.mpr hpos)
   rw [nextCoeff, if_neg (natDegree_nz_of_nz_nextCoeff h), this] at h
   apply le_natDegree_of_ne_zero h
 
-theorem natDegree_pos_of_eraseLead_nz (h : eraseLead P ≠ 0) : natDegree P > 0 := by
+theorem natDegree_pos_of_eraseLead_nz (h : P.eraseLead ≠ 0) : P.natDegree > 0 := by
   by_contra h₂
   rw [eq_C_of_natDegree_eq_zero (Nat.eq_zero_of_not_pos h₂)] at h
   simp at h
@@ -436,26 +396,26 @@ theorem eraseLead_card_support_one (h : P ≠ 0) :
     case zero => by_contra; exact h (card_support_eq_zero.mp h₁);
     case succ => exact Nat.succ_inj'.mpr (eraseLead_card_support' (hc ▸ h₁))
 
-theorem card_support_eq_one_of_eraseLead_zero (h₀ : P ≠ 0) (h₁ : eraseLead P = 0) : P.support.card = 1 :=
+theorem card_support_eq_one_of_eraseLead_zero (h₀ : P ≠ 0) (h₁ : P.eraseLead = 0) : P.support.card = 1 :=
   (card_support_eq_zero.mpr h₁ ▸ eraseLead_card_support_one h₀).symm
 
-theorem card_support_lt_one_of_eraseLead_zero (h : eraseLead P = 0) : P.support.card ≤ 1 := by
+theorem card_support_lt_one_of_eraseLead_zero (h : P.eraseLead = 0) : P.support.card ≤ 1 := by
   by_cases hpz : P = 0
   case pos => simp [hpz]
   case neg => exact le_of_eq (card_support_eq_one_of_eraseLead_zero hpz h)
 
-theorem eraseLead_natDegree_of_zero_nextCoeff (h : nextCoeff P = 0) : natDegree P - 2 ≥ natDegree (eraseLead P) := by
-  -- If eraseLead P = 0, it's trivial.
-  by_cases hepz : eraseLead P = 0; case pos => simp_all
-  -- So take eraseLead P ≠ 0. This also means natDegree P ≠ 0.
-  have hdp : natDegree P ≠ 0 := ne_of_gt (natDegree_pos_of_eraseLead_nz hepz)
+theorem eraseLead_natDegree_of_zero_nextCoeff (h : P.nextCoeff = 0) : P.natDegree - 2 ≥ P.eraseLead.natDegree := by
+  -- If P.eraseLead = 0, it's trivial.
+  by_cases hepz : P.eraseLead = 0; case pos => simp_all
+  -- So take P.eraseLead ≠ 0. This also means P.natDegree ≠ 0.
+  have hdp : P.natDegree ≠ 0 := ne_of_gt (natDegree_pos_of_eraseLead_nz hepz)
   -- Just need to show that eraseLead didn't reduce degree by exactly one.
-  suffices natDegree P - 1 ≠ natDegree (eraseLead P) by
+  suffices P.natDegree - 1 ≠ P.eraseLead.natDegree by
     exact Nat.le_pred_of_lt (lt_of_le_of_ne (eraseLead_natDegree_le P) this.symm)
-  -- By contradiction: eraseLead P would start with nextCoeff P, but that's zero.
+  -- By contradiction: P.eraseLead would start with P.nextCoeff, but that's zero.
   -- And nonzero polynomials never start with a zero.
   by_contra h₂
-  have h₃ : coeff (eraseLead P) (natDegree (eraseLead P)) = coeff P (natDegree P - 1) := by
+  have h₃ : coeff P.eraseLead (P.eraseLead.natDegree) = coeff P (P.natDegree - 1) := by
     rw [h₂]
     apply eraseLead_coeff_of_ne
     intro hc
@@ -466,15 +426,15 @@ theorem eraseLead_natDegree_of_zero_nextCoeff (h : nextCoeff P = 0) : natDegree 
   simp only [nextCoeff, hdp, ite_false] at h
   exact hepz (leadingCoeff_eq_zero.mp (h ▸ h₃))
 
-theorem natDegree_ge_2_of_nextCoeff_eraseLead (h₁ : eraseLead P ≠ 0) (h₂ : nextCoeff P = 0) : natDegree P ≥ 2 := by
-  rcases lt_trichotomy (natDegree P) 1 with h₃ | h₃ | h₃
+theorem natDegree_ge_2_of_nextCoeff_eraseLead (h₁ : P.eraseLead ≠ 0) (h₂ : P.nextCoeff = 0) : P.natDegree ≥ 2 := by
+  rcases lt_trichotomy P.natDegree 1 with h₃ | h₃ | h₃
   case _ =>
     by_contra; revert h₁
     rw [eq_C_of_natDegree_eq_zero (Nat.lt_one_iff.mp h₃), eraseLead_C]
     simp
   case _ =>
     by_contra;
-    have h₀ : natDegree (eraseLead P) = 0 :=
+    have h₀ : P.eraseLead.natDegree = 0 :=
       nonpos_iff_eq_zero.mp (tsub_eq_zero_of_le (le_refl 1) ▸ h₃ ▸ eraseLead_natDegree_le P)
     rw [nextCoeff, h₃, if_neg one_ne_zero, tsub_self] at h₂
     rw [eq_C_of_natDegree_eq_zero h₀, eraseLead_coeff_of_ne, h₂] at h₁
@@ -482,8 +442,8 @@ theorem natDegree_ge_2_of_nextCoeff_eraseLead (h₁ : eraseLead P ≠ 0) (h₂ :
     simp [h₃]
   exact h₃
 
-theorem leadingCoeff_eraseLead_eq_nextCoeff (h : nextCoeff P ≠ 0) : nextCoeff P = leadingCoeff (eraseLead P) := by
-  have hd : natDegree P = natDegree (eraseLead P) + 1 := eraseLead_natDegree_of_nextCoeff h
+theorem leadingCoeff_eraseLead_eq_nextCoeff (h : P.nextCoeff ≠ 0) : P.nextCoeff = P.eraseLead.leadingCoeff := by
+  have hd : P.natDegree = P.eraseLead.natDegree + 1 := eraseLead_natDegree_of_nextCoeff h
   rw [leadingCoeff, nextCoeff]
   simp only [ge_iff_le, coeff_natDegree, if_neg (natDegree_nz_of_nz_nextCoeff h)]
   rw [leadingCoeff]
@@ -492,7 +452,7 @@ theorem leadingCoeff_eraseLead_eq_nextCoeff (h : nextCoeff P ≠ 0) : nextCoeff 
   apply Polynomial.eraseLead_coeff_of_ne
   linarith
 
-theorem ne_zero_eraseLead_of_nz_nextCoeff (h : nextCoeff P ≠ 0) : eraseLead P ≠ 0 :=
+theorem ne_zero_eraseLead_of_nz_nextCoeff (h : P.nextCoeff ≠ 0) : P.eraseLead ≠ 0 :=
   leadingCoeff_ne_zero.mp (leadingCoeff_eraseLead_eq_nextCoeff h ▸ h)
 
 end Polynomial_Eraselead
@@ -518,7 +478,7 @@ theorem coeffList_C {η : α} (h : η ≠ 0): coeffList (C η) = [η] := by
   simp [coeffList, if_neg h, List.range_succ]
 
 /-- coeffList always starts with leadingCoeff -/
-theorem coeffList_eq_cons_leadingCoeff (h : P ≠ 0) : ∃(ls : List α), coeffList P = (leadingCoeff P)::ls := by
+theorem coeffList_eq_cons_leadingCoeff (h : P ≠ 0) : ∃(ls : List α), coeffList P = P.leadingCoeff::ls := by
   by_cases P = 0 <;> simp_all [coeffList, List.range_succ]
 
 /-- The length of the coefficient list is the degree. -/
@@ -526,9 +486,9 @@ theorem coeffList_eq_cons_leadingCoeff (h : P ≠ 0) : ∃(ls : List α), coeffL
 theorem length_coeffList (P : Polynomial α) : (coeffList P).length = if (P=0) then 0 else P.natDegree+1 := by
   by_cases P = 0 <;> simp_all [coeffList]
 
-/-- If the `nextCoeff P ≠ 0`, then the tail of `P.coeffList` is `coeffList P.eraseLead`.-/
-theorem coeffList_eraseLead_nz (h : nextCoeff P ≠ 0) : coeffList P = (leadingCoeff P)::(coeffList (eraseLead P)) := by
-  have hd : natDegree P = natDegree (eraseLead P) + 1 := eraseLead_natDegree_of_nextCoeff h
+/-- If the `P.nextCoeff ≠ 0`, then the tail of `P.coeffList` is `coeffList P.eraseLead`.-/
+theorem coeffList_eraseLead_nz (h : P.nextCoeff ≠ 0) : coeffList P = P.leadingCoeff::P.eraseLead.coeffList := by
+  have hd : P.natDegree = P.eraseLead.natDegree + 1 := eraseLead_natDegree_of_nextCoeff h
   have hpz : P ≠ 0 := ne_zero_of_nz_nextCoeff h
   simp [coeffList, hd, hpz, ne_zero_eraseLead_of_nz_nextCoeff h, List.range_succ]
   constructor
@@ -548,8 +508,8 @@ theorem coeffList_eraseLead_nz (h : nextCoeff P ≠ 0) : coeffList P = (leadingC
   linarith
 
 /- Coefficients of P are always the leading coefficient, some number of zeros, and then `coeffList P.eraseLead`. -/
-theorem coeffList_eraseLead (h : P≠0) : ∃(n:ℕ), coeffList P = (leadingCoeff P)::((List.replicate n 0)++(coeffList (eraseLead P))) := by
-  by_cases hdp : natDegree P = 0
+theorem coeffList_eraseLead (h : P≠0) : ∃(n:ℕ), coeffList P = P.leadingCoeff::((List.replicate n 0)++P.eraseLead.coeffList) := by
+  by_cases hdp : P.natDegree = 0
   case pos =>
     use 0
     rw [eq_C_of_natDegree_eq_zero hdp] at h ⊢
@@ -557,22 +517,22 @@ theorem coeffList_eraseLead (h : P≠0) : ∃(n:ℕ), coeffList P = (leadingCoef
     rw [hcnz]
     simp
   replace hdp := Nat.ne_zero_iff_zero_lt.mp hdp
-  have hd : natDegree P ≥ natDegree (eraseLead P) + 1 := by
+  have hd : P.natDegree ≥ P.eraseLead.natDegree + 1 := by
     have := eraseLead_natDegree_le P
-    have : natDegree (eraseLead P) + 1 ≤ (natDegree P - 1) + 1 := (add_le_add_iff_right 1).mpr this
-    rwa [← Nat.sub_add_of_ge hdp] at this
+    have : P.eraseLead.natDegree + 1 ≤ (P.natDegree - 1) + 1 := (add_le_add_iff_right 1).mpr this
+    rwa [Nat.sub_add_cancel hdp] at this
   obtain ⟨dd, hd⟩ := exists_add_of_le hd
   rw [Nat.add_comm] at hd
-  use if eraseLead P = 0 then natDegree P else dd
+  use if P.eraseLead = 0 then P.natDegree else dd
   --need α to be Inhabited to use get!, so we designate 0 as the default
   have _ : Inhabited α := ⟨0⟩
-  apply List.ext_get! <;> by_cases hep : eraseLead P = 0
-  case pos => --lengths are equal, eraseLead P = 0
+  apply List.ext_get! <;> by_cases hep : P.eraseLead = 0
+  case pos => --lengths are equal, P.eraseLead = 0
     simp [if_pos hep, h]
-  case neg => --lengths are equal, eraseLead P ≠ 0
+  case neg => --lengths are equal, P.eraseLead ≠ 0
     simp [if_neg hep, h]
     exact Nat.add_comm dd _ ▸ hd
-  case pos => --contents are equal, eraseLead P = 0
+  case pos => --contents are equal, P.eraseLead = 0
     intro n
     simp only [if_pos hep, nonpos_iff_eq_zero, tsub_zero, List.get!_eq_getD]
     cases n
@@ -585,7 +545,7 @@ theorem coeffList_eraseLead (h : P≠0) : ∃(n:ℕ), coeffList P = (leadingCoef
         List.append_nil, List.length_cons, Nat.sub_zero]
       clear hdp
       rw [List.map_reverse]
-      by_cases hnp : n1 + 1 < natDegree P + 1
+      by_cases hnp : n1 + 1 < P.natDegree + 1
       case pos =>
         rw [List.getD_reverse]
         case h =>
@@ -596,8 +556,8 @@ theorem coeffList_eraseLead (h : P≠0) : ∃(n:ℕ), coeffList P = (leadingCoef
         rw [List.getD_replicate_elem_eq]
         case h => exact (add_lt_add_iff_right 1).mp (hd ▸ hnp)
         obtain ⟨np, hnp⟩ := exists_add_of_le (Nat.le_of_lt_succ hnp)
-        have hnp2 : np = natDegree P - (n1 + 1) := (Nat.sub_eq_of_eq_add (Nat.add_comm _ np ▸ hnp)).symm
-        have : coeff (eraseLead P) np = coeff P np := by
+        have hnp2 : np = P.natDegree - (n1 + 1) := (Nat.sub_eq_of_eq_add (Nat.add_comm _ np ▸ hnp)).symm
+        have : coeff P.eraseLead np = coeff P np := by
           apply eraseLead_coeff_of_ne np
           linarith
         rw [hd] at hnp2
@@ -611,7 +571,7 @@ theorem coeffList_eraseLead (h : P≠0) : ∃(n:ℕ), coeffList P = (leadingCoef
         rw [List.getD_eq_default, List.getD_eq_default]
         simp_all
         simp_all only [List.length_reverse, List.length_map, List.length_range]
-  case neg => --contents are equal, eraseLead P ≠ 0
+  case neg => --contents are equal, P.eraseLead ≠ 0
     simp [if_neg hep]
     intro n
     cases n
@@ -621,7 +581,7 @@ theorem coeffList_eraseLead (h : P≠0) : ∃(n:ℕ), coeffList P = (leadingCoef
     case succ n1 => --1st element on is the same
       simp_rw [coeffList, if_neg hep, if_neg h]
       simp_rw [List.map_reverse]
-      by_cases hnp : n1 + 1 < natDegree P + 1
+      by_cases hnp : n1 + 1 < P.natDegree + 1
       case pos =>
         obtain ⟨dp, hdp⟩ := exists_add_of_le (Nat.le_of_lt_succ hnp)
         rw [List.getD_reverse]
@@ -630,7 +590,7 @@ theorem coeffList_eraseLead (h : P≠0) : ∃(n:ℕ), coeffList P = (leadingCoef
         rw [List.getD, List.length_map, List.length_range]
         rw [List.get?_map]
         rw [List.get?_range, Option.map_some', Option.getD_some, add_tsub_cancel_right]
-        have : coeff (eraseLead P) dp = coeff P dp := by
+        have : coeff P.eraseLead dp = coeff P dp := by
           apply eraseLead_coeff_of_ne dp
           linarith
         -- rw [hd] at hdp
@@ -672,8 +632,8 @@ theorem coeffList_eraseLead (h : P≠0) : ∃(n:ℕ), coeffList P = (leadingCoef
           apply Nat.sub_lt <;> simp
         rw [add_tsub_cancel_right]
         calc
-          natDegree P - Nat.succ n1 ≤ natDegree P := Nat.sub_le _ _
-          natDegree P < natDegree P + 1 := Nat.lt_succ_self _
+          P.natDegree - Nat.succ n1 ≤ P.natDegree := Nat.sub_le _ _
+          P.natDegree < P.natDegree + 1 := Nat.lt_succ_self _
       case neg =>
         replace hnp := Nat.ge_of_not_lt hnp
         simp only [List.getD_cons_succ]
@@ -684,8 +644,8 @@ theorem coeffList_eraseLead (h : P≠0) : ∃(n:ℕ), coeffList P = (leadingCoef
 variable {α : Type*} [Ring α] (P : Polynomial α) [DecidableEq α]
 
 /-- The coefficient list is negated if the polynomial is negated. --/
-theorem coeffList_neg : (coeffList (-P)) = (coeffList P).map (λx↦-x) := by
-  by_cases hp : (P = 0) <;> simp only [
+theorem coeffList_neg : (-P).coeffList = P.coeffList.map (λx↦-x) := by
+  by_cases hp : P = 0 <;> simp only [
     coeffList, hp, natDegree_neg, natDegree_zero, ite_false, ite_true,
     neg_zero, neg_eq_zero, zero_add, List.map_nil, List.map_map]
   congr; funext; simp
@@ -694,7 +654,7 @@ variable {α : Type*} [DivisionSemiring α] (P : Polynomial α) [DecidableEq α]
 
 /-- Over a division semiring, multiplying a polynomial by a nonzero constant multiplies the coefficient list. -/
 theorem coeffList_mul_C {η : α} (hη : η ≠ 0) :
-  coeffList (C η * P) = (coeffList P).map (λx↦η*x) := by
+  coeffList (C η * P) = P.coeffList.map (λx↦η*x) := by
     by_cases hp : P = 0
     case pos => simp only [hp, mul_zero, coeffList_zero, List.map_nil]
     have hcη : C η * P ≠ 0 := mul_ne_zero (mt (map_eq_zero _).mp hη) hp
@@ -704,45 +664,5 @@ theorem coeffList_mul_C {η : α} (hη : η ≠ 0) :
     funext n
     simp
     exact hη
-
--- @[simp]
--- theorem coeffList_mul_X (hP : P ≠ 0) : coeffList (X * P) = (coeffList P) ++ [0] := by
---   rw [coeffList, coeffList]
---   rw [natDegree_X_mul hP]
---   rw [List.range_succ]
---   rw [List.map_append]
---   apply List.ext_get
---   case hl =>
---     simp only [List.length_append, List.length_map, List.length_range, List.length_singleton, add_comm]
---   simp
---   intro n h1 _
---   by_cases h2 : n = (P.natDegree+1)
---   case pos => rw [List.get_append_right] <;> simp [h2]
---   case neg =>
---     rw [List.get_append]
---     case h =>
---       simp
---       clear hP
---       linarith (config := {splitNe := true})
---     by_cases h3 : n = 0
---     case pos => simp [h3]
---     case neg =>
---       rw [List.get_cons_pos]
---       case hp => exact h3
---       case hl => simp [h1]; exact Nat.le_of_lt_succ h1
---       have h4 : n = (n - 1) + 1 := Nat.sub_add_of_ge (pos_iff_ne_zero.mpr h3)
---       simp only [List.get_map, List.get_range, ge_iff_le]
---       rw [h4]
---       simp
-
-variable {α : Type*} [Ring α] (P : Polynomial α)
-
--- @[simp]
--- theorem coeffList_mul_linear {η : α} (hp : P ≠ 0) : coeffList ((X - C η) * P) = sorry := by
---   conv =>
---     lhs
---     simp only [coeffList, coeff_mul]
-
---   sorry
 
 end Polynomial
